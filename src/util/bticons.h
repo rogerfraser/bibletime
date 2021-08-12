@@ -74,6 +74,7 @@ public: /* Fields: */
     RegularIcon const icon_displayconfig;
     RegularIcon const icon_document_magnifier;
     RegularIcon const icon_edit_clear_locationbar;
+    RegularIcon const icon_edit_lyx;
     RegularIcon const icon_edit_copy;
     RegularIcon const icon_exit;
     RegularIcon const icon_export;

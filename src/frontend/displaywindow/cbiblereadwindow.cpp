@@ -107,6 +107,9 @@ void CBibleReadWindow::insertKeyboardActions( BtActionCollection* const a ) {
     //    qaction = new QAction(tr("Reference only"), a );
     //    a->addAction("copyReferenceOnly", qaction);
 
+    qaction = new QAction(tr("Pipe to LyX"), a);
+    a->addAction("pipeRefAndTextToLyX", qaction);
+    
     qaction = new QAction(tr("Text of reference"), a);
     a->addAction("copyTextOfReference", qaction);
 
@@ -138,6 +141,12 @@ void CBibleReadWindow::initActions() {
     m_actions.findStrongs = &ac->action(CResMgr::displaywindows::general::findStrongs::actionName);
     m_actions.copy.referenceOnly = &ac->action("copyReferenceOnly");
 
+    m_actions.pipeRefAndTextToLyX = 
+            &initAction("pipeRefAndTextToLyX",
+                        displayWidget(),
+                        &BtModelViewReadDisplay::pipeAnchorWithText);
+    m_actions.pipeRefAndTextToLyX->setIcon(CResMgr::displaywindows::bibleWindow::lyxMenu::icon());
+    
     m_actions.copy.referenceTextOnly =
             &initAddAction("copyTextOfReference",
                            displayWidget(),
@@ -200,6 +209,10 @@ void CBibleReadWindow::setupPopupMenu() {
 
     popup()->addSeparator();
 
+    popup()->addAction(m_actions.pipeRefAndTextToLyX);
+
+    popup()->addSeparator();
+
     m_actions.copyMenu = new QMenu(tr("Copy"), popup());
 
     m_actions.copyMenu->addSeparator();
@@ -241,6 +254,9 @@ void CBibleReadWindow::updatePopupMenu() {
     m_actions.findStrongs->setEnabled(!display.getCurrentNodeInfo().isNull());
 
     bool const hasActiveAnchor = display.hasActiveAnchor();
+    
+    m_actions.pipeRefAndTextToLyX->setEnabled(hasActiveAnchor);
+    
     m_actions.copy.referenceOnly->setEnabled(hasActiveAnchor);
     m_actions.copy.referenceTextOnly->setEnabled(hasActiveAnchor);
     m_actions.copy.referenceAndText->setEnabled(hasActiveAnchor);

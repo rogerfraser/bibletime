@@ -90,9 +90,12 @@ public: /* Methods: */
     */
     bool copy(TextType const format, TextPart const part);
 
+    bool pipe(TextType const format, TextPart const part);
+
     void copyAnchorOnly() { copy(PlainText, AnchorOnly); }
     void copyAnchorTextOnly() { copy(PlainText, AnchorTextOnly); }
     void copyAnchorWithText() { copy(PlainText, AnchorWithText); }
+    void pipeAnchorWithText() { pipe(PlainText, AnchorWithText); }
     void saveAnchorWithText() { save(PlainText, AnchorWithText); }
     void copyAll() { copy(PlainText, Document); }
 

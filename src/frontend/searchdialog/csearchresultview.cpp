@@ -47,9 +47,6 @@ void CSearchResultView::initView() {
     //setup the popup menu
     m_popup = new QMenu(this);
 
-    m_actions.copyMenu = new QMenu(tr("Copy..."), m_popup);
-    m_actions.copyMenu->setIcon(CResMgr::searchdialog::result::foundItems::copyMenu::icon());
-
     struct SelectedKeysList : QList<CSwordKey *> {
         SelectedKeysList(CSearchResultView & self) {
             auto const * const m = self.m_module;
@@ -67,6 +64,21 @@ void CSearchResultView::initView() {
 
         ~SelectedKeysList() noexcept { qDeleteAll(*this); }
     };
+
+    m_actions.pipeRefAndTextToLyX = new QAction(tr("Pipe to LyX"), this);
+    m_actions.pipeRefAndTextToLyX->setIcon(CResMgr::searchdialog::result::foundItems::lyxMenu::icon());
+    BT_CONNECT(m_actions.pipeRefAndTextToLyX, &QAction::triggered,
+               [this]{
+                   SelectedKeysList keys(*this);
+                   CExportManager(true, tr("Piping search result"))
+                           .pipeKeyList(keys, CExportManager::Text, true);
+               });
+    m_popup->addAction(m_actions.pipeRefAndTextToLyX);   
+    
+    m_popup->addSeparator();
+
+    m_actions.copyMenu = new QMenu(tr("Copy..."), m_popup);
+    m_actions.copyMenu->setIcon(CResMgr::searchdialog::result::foundItems::copyMenu::icon());
 
     m_actions.copy.result = new QAction(tr("Reference only"), this);
     BT_CONNECT(m_actions.copy.result, &QAction::triggered,

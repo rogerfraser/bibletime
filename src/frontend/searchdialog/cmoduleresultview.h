@@ -103,6 +103,8 @@ class CModuleResultView : public QTreeWidget {
             }
             copy;
 
+            QAction* pipeRefAndTextToLyX;
+
         } m_actions;
 
         QMenu* m_popup;

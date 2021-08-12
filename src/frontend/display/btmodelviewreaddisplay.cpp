@@ -104,6 +104,48 @@ bool BtModelViewReadDisplay::copy(TextType const format, TextPart const part) {
     return true;
 }
 
+bool BtModelViewReadDisplay::pipe(TextType const format, TextPart const part) {
+
+    QString homePath(getenv("HOME"));
+    QString lyxpipeinPath(homePath + "/.lyx/lyxpipe.in"); 
+    
+    QFileInfo fi(lyxpipeinPath);
+    if (!fi.exists()) {
+        return false;
+    }
+    
+    QString verse = text(format, part);
+    QGuiApplication::clipboard()->setText(text(format, part));
+
+    /* Open the pipe for writing */
+    QFile file(lyxpipeinPath);
+    if (!file.open(QFile::WriteOnly | QFile::Text)) {
+        return false;
+    }
+
+    file.write("LYXCMD:bibletime:clipboard-paste:\n");
+    //QByteArray ba = verse.toLocal8Bit();
+    //const char *c_str2 = ba.data();
+    //file.write(c_str2);
+    file.flush();
+    file.close();
+    
+
+    //// test
+    //QFile tmpFile("/home/roger/tmp.txt");
+    //if (!tmpFile.open(QFile::WriteOnly | QFile::Text)) {
+	//    return false;
+    //}
+    //
+    //QByteArray ba = verse.toLocal8Bit();
+    //const char *c_str2 = ba.data();
+    //tmpFile.write(c_str2);
+    //tmpFile.flush();    
+    //tmpFile.close();
+
+    return true;
+}
+
 void BtModelViewReadDisplay::copySelectedText()
 { QGuiApplication::clipboard()->setText(qmlInterface()->getSelectedText()); }
 

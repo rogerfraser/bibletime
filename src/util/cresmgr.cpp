@@ -34,7 +34,7 @@ const QKeySequence accel(Qt::CTRL + Qt::Key_O);
 const char* actionName    = "mainindex_search_action";
 }
 namespace searchdefaultbible {
-const QKeySequence accel(Qt::CTRL + Qt::ALT + Qt::Key_F);
+const QKeySequence accel(Qt::Key_F3);
 const char* actionName    = "mainindex_searchdefaultbible_action";
 }
 } // namespace mainIndex {
@@ -130,7 +130,7 @@ const QKeySequence accel(Qt::Key_F2);
 const char* actionName    = "helpHowTo_action";
 }
 namespace tipOfTheDay {
-const QKeySequence accel(Qt::Key_F3);
+const QKeySequence accel(Qt::Key_F8);
 const char* actionName    = "tipOfTheDay_action";
 }
 }//mainMenu::help

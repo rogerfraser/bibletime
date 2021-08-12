@@ -78,6 +78,8 @@ class CSearchResultView  : public QTreeWidget {
                 QAction* resultWithText;
             }
             copy;
+
+            QAction* pipeRefAndTextToLyX;
         }
         m_actions;
 

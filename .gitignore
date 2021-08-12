@@ -30,3 +30,4 @@ bibletime*.qm
 moc_*.cpp
 qrc_*.cpp
 /.vscode
+*.po

@@ -57,6 +57,8 @@ protected: /* Methods: */
         QAction* findText;
         QAction* findStrongs;
 
+        QAction* pipeRefAndTextToLyX;
+
         QMenu* copyMenu;
         struct {
             QAction* referenceOnly;

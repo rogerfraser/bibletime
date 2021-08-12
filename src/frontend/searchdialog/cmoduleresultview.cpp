@@ -64,6 +64,21 @@ void CModuleResultView::initView() {
     //setup the popup menu
     m_popup = new QMenu(this);
 
+    m_actions.pipeRefAndTextToLyX = new QAction(tr("Pipe to LyX"), this);
+    m_actions.pipeRefAndTextToLyX->setIcon(CResMgr::searchdialog::result::moduleList::lyxMenu::icon());
+    BT_CONNECT(m_actions.pipeRefAndTextToLyX, &QAction::triggered,
+               [this]{
+                   if (auto * const m = activeModule())
+                       CExportManager(true, tr("Piping search result to LyX"))
+                               .pipeKeyList(m_results[m],
+                                            m,
+                                            CExportManager::Text,
+                                            true);
+               });
+    m_popup->addAction(m_actions.pipeRefAndTextToLyX);
+    
+    m_popup->addSeparator();
+
     m_actions.copyMenu = new QMenu(tr("Copy..."), m_popup);
     m_actions.copyMenu->setIcon(CResMgr::searchdialog::result::moduleList::copyMenu::icon());
     m_actions.copy.result = new QAction(tr("Reference only"), this);

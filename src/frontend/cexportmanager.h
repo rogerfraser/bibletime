@@ -64,8 +64,17 @@ public: /* Methods: */
                  Format const format,
                  bool const addText);
 
+    bool pipeKeyList(CSwordModuleSearch::ModuleResultList const & list,
+                     CSwordModuleInfo const * const module,
+                     Format const format,
+                     bool const addText);
+
     bool copyKeyList(CSwordModuleSearch::ModuleResultList const & list,
                      CSwordModuleInfo const * const module,
+                     Format const format,
+                     bool const addText);
+
+    bool pipeKeyList(QList<CSwordKey *> const & list,
                      Format const format,
                      bool const addText);
 

@@ -237,11 +237,13 @@ BT_GETICON2(icon_setupScope, configure)
 
 namespace result {
 namespace moduleList {
+namespace lyxMenu { BT_GETICON(edit_lyx) }
 namespace copyMenu { BT_GETICON(edit_copy) }
 namespace saveMenu { BT_GETICON(file_save) }
 namespace printMenu { BT_GETICON(print) }
 }
 namespace foundItems {
+namespace lyxMenu { BT_GETICON(edit_lyx) }
 namespace copyMenu { BT_GETICON(edit_copy) }
 namespace saveMenu { BT_GETICON(file_save) }
 namespace printMenu { BT_GETICON(print) }
@@ -303,6 +305,7 @@ namespace previousVerse {
 extern const QKeySequence accel;
 }
 
+namespace lyxMenu { BT_GETICON(edit_lyx) }
 namespace copyMenu { BT_GETICON(edit_copy) }
 namespace saveMenu { BT_GETICON(file_save) }
 namespace printMenu { BT_GETICON(print) }

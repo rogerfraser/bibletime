@@ -224,6 +224,46 @@ bool CExportManager::copyKeyList(CSwordModuleSearch::ModuleResultList const & l,
     return true;
 }
 
+bool CExportManager::pipeKeyList(CSwordModuleSearch::ModuleResultList const & l,
+                                 CSwordModuleInfo const * const module,
+                                 Format const format,
+                                 bool const addText)
+{
+    if (l.empty())
+        return false;
+
+    CTextRendering::KeyTree tree; /// \todo Verify that items in tree are properly freed.
+    KTI::Settings itemSettings;
+    itemSettings.highlight = false;
+
+    for (auto const & keyPtr : l) {
+        if (progressWasCancelled())
+            return false;
+        tree.emplace_back(QString::fromLocal8Bit(keyPtr->getText()),
+                          module,
+                          itemSettings);
+    }
+
+    copyToClipboard(newRenderer(format, addText)->renderKeyTree(tree));
+    closeProgressDialog();
+
+    QString homePath(getenv("HOME"));
+    QString lyxpipeinPath(homePath + "/.lyx/lyxpipe.in");
+    
+    /* Open the pipe for writing */
+    QFile file(lyxpipeinPath);
+    if (!file.open(QFile::WriteOnly | QFile::Text)) {
+        return false;
+    }
+
+    /* Insert clipboard-paste command */
+    file.write("LYXCMD:bibletime:clipboard-paste:\n");
+    file.flush();
+    file.close();
+
+    return true;
+}
+
 
 bool CExportManager::copyKeyList(QList<CSwordKey *> const & list,
                                  Format const format,
@@ -246,6 +286,45 @@ bool CExportManager::copyKeyList(QList<CSwordKey *> const & list,
 
     copyToClipboard(newRenderer(format, addText)->renderKeyTree(tree));
     closeProgressDialog();
+    return true;
+}
+
+bool CExportManager::pipeKeyList(QList<CSwordKey *> const & list,
+                                 Format const format,
+                                 bool const addText)
+{
+    if (list.empty())
+        return false;
+
+    CTextRendering::KeyTree tree; /// \todo Verify that items in tree are properly freed.
+    KTI::Settings itemSettings;
+    itemSettings.highlight = false;
+
+    setProgressRange(list.count());
+    for (CSwordKey const * const k : list) {
+        if (progressWasCancelled())
+            return false;
+        tree.emplace_back(k->key(), k->module(), itemSettings);
+        incProgress();
+    };
+
+    copyToClipboard(newRenderer(format, addText)->renderKeyTree(tree));
+    closeProgressDialog();
+
+    QString homePath(getenv("HOME"));
+    QString lyxpipeinPath(homePath + "/.lyx/lyxpipe.in");
+    
+    /* Open the pipe for writing */
+    QFile file(lyxpipeinPath);
+    if (!file.open(QFile::WriteOnly | QFile::Text)) {
+        return false;
+    }
+
+    /* Insert clipboard-paste command */
+    file.write("LYXCMD:bibletime:clipboard-paste:\n");
+    file.flush();
+    file.close();
+    
     return true;
 }
 
