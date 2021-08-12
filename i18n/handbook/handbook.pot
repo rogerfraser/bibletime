@@ -1440,7 +1440,7 @@ msgstr ""
 #: docs/handbook/en/docbook/hdbk-reference.docbook:279
 msgid ""
 "<menuchoice> <shortcut> <keycombo action=\"simul\"> "
-"<keycap>&Ctrl;+&Alt;+F</keycap></keycombo> </shortcut> <guimenu> "
+"<keycap>F3</keycap></keycombo> </shortcut> <guimenu> "
 "<placeholder type=\"inlinemediaobject\" id=\"0\"/>Search</guimenu> "
 "<guimenuitem>Search in standard bible</guimenuitem> </menuchoice>"
 msgstr ""
@@ -1782,7 +1782,7 @@ msgstr ""
 #. type: Content of: <chapter><sect1><sect2><variablelist><varlistentry><term>
 #: docs/handbook/en/docbook/hdbk-reference.docbook:690
 msgid ""
-"<menuchoice> <shortcut> <keycombo action=\"simul\"> <keycap>F3</keycap> "
+"<menuchoice> <shortcut> <keycombo action=\"simul\"> <keycap>F8</keycap> "
 "</keycombo> </shortcut> <guimenu> <placeholder type=\"inlinemediaobject\" "
 "id=\"0\"/>Help</guimenu> <guimenuitem>Tip of the Day</guimenuitem> "
 "</menuchoice>"
@@ -2015,7 +2015,7 @@ msgstr ""
 
 #. type: Content of: <chapter><sect1><informaltable><tgroup><tbody><row><entry>
 #: docs/handbook/en/docbook/hdbk-reference.docbook:1058
-msgid "<keycombo action=\"simul\"> <keycap>&Ctrl;+&Alt;+F</keycap></keycombo>"
+msgid "<keycombo action=\"simul\"> <keycap>F3</keycap></keycombo>"
 msgstr ""
 
 #. type: Content of: <chapter><sect1><informaltable><tgroup><tbody><row><entry>
@@ -2296,7 +2296,7 @@ msgstr ""
 
 #. type: Content of: <chapter><sect1><informaltable><tgroup><tbody><row><entry>
 #: docs/handbook/en/docbook/hdbk-reference.docbook:1357
-msgid "<keycombo action=\"simul\"> <keycap>F3</keycap> </keycombo>"
+msgid "<keycombo action=\"simul\"> <keycap>F8</keycap> </keycombo>"
 msgstr ""
 
 #. type: Content of: <chapter><sect1><informaltable><tgroup><tbody><row><entry>

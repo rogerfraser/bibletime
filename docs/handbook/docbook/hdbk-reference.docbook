@@ -279,7 +279,7 @@
             <menuchoice>
               <shortcut>
                 <keycombo action="simul">
-                <keycap>&Ctrl;+&Alt;+F</keycap></keycombo>
+                <keycap>F3</keycap></keycombo>
               </shortcut>
               <guimenu>
               <inlinemediaobject>
@@ -690,7 +690,7 @@
             <menuchoice>
               <shortcut>
                 <keycombo action="simul">
-                  <keycap>F3</keycap>
+                  <keycap>F8</keycap>
                 </keycombo>
               </shortcut>
               <guimenu>
@@ -1355,7 +1355,7 @@
           <row>
             <entry>
               <keycombo action="simul">
-                <keycap>F3</keycap>
+                <keycap>F8</keycap>
               </keycombo>
             </entry>
             <entry>
