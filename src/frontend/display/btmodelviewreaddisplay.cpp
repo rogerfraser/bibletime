@@ -114,34 +114,17 @@ bool BtModelViewReadDisplay::pipe(TextType const format, TextPart const part) {
         return false;
     }
     
-    QString verse = text(format, part);
-    QGuiApplication::clipboard()->setText(text(format, part));
-
     /* Open the pipe for writing */
     QFile file(lyxpipeinPath);
     if (!file.open(QFile::WriteOnly | QFile::Text)) {
         return false;
     }
 
+    QGuiApplication::clipboard()->setText(text(format, part));
     file.write("LYXCMD:bibletime:clipboard-paste:\n");
-    //QByteArray ba = verse.toLocal8Bit();
-    //const char *c_str2 = ba.data();
-    //file.write(c_str2);
     file.flush();
     file.close();
     
-
-    //// test
-    //QFile tmpFile("/home/roger/tmp.txt");
-    //if (!tmpFile.open(QFile::WriteOnly | QFile::Text)) {
-	//    return false;
-    //}
-    //
-    //QByteArray ba = verse.toLocal8Bit();
-    //const char *c_str2 = ba.data();
-    //tmpFile.write(c_str2);
-    //tmpFile.flush();    
-    //tmpFile.close();
 
     return true;
 }
@@ -316,11 +299,15 @@ BtModelViewReadDisplay::text(TextType const format, TextPart const part) {
             FilterOptions filterOptions;
             CSwordBackend::instance()->setFilterOptions(filterOptions);
 
-            return QString(key->strippedText()).append("\n(")
-                    .append(key->key())
-                    .append(", ")
-                    .append(key->module()->name())
-                    .append(")");
+            //return QString(key->strippedText()).append("\n(")
+            //        .append(key->key())
+            //        .append(", ")
+            //        .append(key->module()->name())
+            //        .append(")");
+
+            return QString(key->key()).append(" ")
+                .append(key->strippedText())
+                .append("\n");
         }
         return {};
     }

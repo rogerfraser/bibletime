@@ -244,7 +244,6 @@ bool CExportManager::pipeKeyList(CSwordModuleSearch::ModuleResultList const & l,
                           itemSettings);
     }
 
-    copyToClipboard(newRenderer(format, addText)->renderKeyTree(tree));
     closeProgressDialog();
 
     QString homePath(getenv("HOME"));
@@ -257,6 +256,10 @@ bool CExportManager::pipeKeyList(CSwordModuleSearch::ModuleResultList const & l,
     }
 
     /* Insert clipboard-paste command */
+    QString text = newRenderer(format, addText)->renderKeyTree(tree);
+    text.replace(":\n", " ");
+    copyToClipboard(text);    
+    
     file.write("LYXCMD:bibletime:clipboard-paste:\n");
     file.flush();
     file.close();
@@ -308,7 +311,6 @@ bool CExportManager::pipeKeyList(QList<CSwordKey *> const & list,
         incProgress();
     };
 
-    copyToClipboard(newRenderer(format, addText)->renderKeyTree(tree));
     closeProgressDialog();
 
     QString homePath(getenv("HOME"));
@@ -321,6 +323,10 @@ bool CExportManager::pipeKeyList(QList<CSwordKey *> const & list,
     }
 
     /* Insert clipboard-paste command */
+    QString text = newRenderer(format, addText)->renderKeyTree(tree);
+    text.replace(":\n", " ");
+    copyToClipboard(text);
+    
     file.write("LYXCMD:bibletime:clipboard-paste:\n");
     file.flush();
     file.close();
