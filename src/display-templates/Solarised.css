@@ -97,16 +97,19 @@ td.entry + td.entry {
 }
 
 .entryname {
-    font-size:80%;
-    padding:0 2px 0 0;
-    vertical-align:super;
+    font-size: 100%;
+    font-weight: bold;
+    padding:0 2px 2px 0;
 }
 .entry[dir=rtl] .entryname, .currententry[dir=rtl] .entryname {
-    padding: 0 0 0 2px;
-    font-size: 80%;
-    vertical-align: super;
+    padding:0 2px 2px 0;
+    font-size: 100%;
+    font-weight: bold;
 }
 .entryname a, #printer .entryname  {
+    font-size: 100%;
+    font-weight: bold;
+    padding:0 2px 2px 0;
 }
 
 #printer .entry  .entry, #printer .entry .sectiontitle , #printer .entry .booktitle {
