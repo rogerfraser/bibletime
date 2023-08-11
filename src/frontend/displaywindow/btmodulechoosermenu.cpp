@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -103,11 +103,11 @@ BtModuleChooserMenu::BtModuleChooserMenu(
                     if (itemIndex.isValid()) {
                         auto const & sortedModel =
                                 *static_cast<SortModel *>(m_sortedModel);
-                        Q_EMIT sigModuleChosen(
+                        emit sigModuleChosen(
                                     sortedModel.m_sourceModel->module(
                                         sortedModel.mapToSource(itemIndex)));
                     } else {
-                        Q_EMIT sigModuleChosen(nullptr);
+                        emit sigModuleChosen(nullptr);
                     }
                });
 }
@@ -117,17 +117,17 @@ void BtModuleChooserMenu::preBuildMenu(QActionGroup * actionGroup) {
     actionGroup->setExclusive(true);
 
     if (m_flags & AddNoneButton) {
-        QAction * noneAction = new QAction(this);
-        noneAction->setCheckable(true);
-        noneAction->setText(tr("NONE"));
-        noneAction->setChecked(m_selectedModule.isEmpty());
-        noneAction->setDisabled(
+        m_noneAction = new QAction(this);
+        m_noneAction->setCheckable(true);
+        m_noneAction->setText(tr("NONE"));
+        m_noneAction->setChecked(m_selectedModule.isEmpty());
+        m_noneAction->setDisabled(
                     m_newModulesToUse.size() <= 1
                     || (m_buttonIndex <= 0 && m_leftLikeModules <= 1));
-        noneAction->setActionGroup(actionGroup);
-        BT_CONNECT(noneAction, &QAction::triggered,
-                   [this]{ Q_EMIT triggered(QModelIndex()); });
-        addAction(noneAction);
+        m_noneAction->setActionGroup(actionGroup);
+        BT_CONNECT(m_noneAction, &QAction::triggered,
+                   [this]{ emit triggered(QModelIndex()); });
+        addAction(m_noneAction);
 
         addSeparator();
     }

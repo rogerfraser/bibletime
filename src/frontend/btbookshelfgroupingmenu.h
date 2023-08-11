@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTBOOKSHELFGROUPINGMENU_H
+#define BTBOOKSHELFGROUPINGMENU_H
 
 #include <QMenu>
 
@@ -23,19 +24,22 @@ class QActionGroup;
 class BtBookshelfGroupingMenu: public QMenu {
     Q_OBJECT
     public:
-        explicit BtBookshelfGroupingMenu(QWidget * parent = nullptr)
+        explicit inline BtBookshelfGroupingMenu(QWidget *parent = nullptr)
             : QMenu(parent) { initMenu(true); }
 
-        explicit BtBookshelfGroupingMenu(bool showNoGrouping,
-                                         QWidget * parent = nullptr)
+        explicit inline BtBookshelfGroupingMenu(bool showNoGrouping,
+                                                QWidget *parent = nullptr)
         : QMenu(parent) { initMenu(showNoGrouping); }
 
-    Q_SIGNALS:
+    signals:
         void signalGroupingOrderChanged(const BtBookshelfTreeModel::Grouping &);
 
     private:
         void initMenu(bool showNoGrouping);
         void retranslateUi();
+
+    private slots:
+        void slotGroupingActionTriggered(QAction *action);
 
     private:
         QActionGroup *m_groupingActionGroup;
@@ -45,3 +49,5 @@ class BtBookshelfGroupingMenu: public QMenu {
         QAction *m_groupingLangAction;
         QAction *m_groupingNoneAction;
 };
+
+#endif // BTBOOKSHELFGROUPINGMENU_H

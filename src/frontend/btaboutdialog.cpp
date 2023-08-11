@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -88,14 +88,13 @@ BtAboutDialog::BtAboutDialog(QWidget *parent, Qt::WindowFlags wflags)
     mainLayout->addWidget(m_buttonBox);
     setLayout(mainLayout);
 
-    BT_CONNECT(m_buttonBox, &QDialogButtonBox::rejected,
-               this, &BtAboutDialog::reject);
+    BT_CONNECT(m_buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
 
     retranslateUi();
 }
 
 void BtAboutDialog::resizeEvent(QResizeEvent* event) {
-    Q_UNUSED(event)
+    Q_UNUSED(event);
     QString version = "BibleTime " BT_VERSION;
     QFontMetrics fm(m_versionLabel->font());
     int w = width()  - m_iconLabel->width() - 80;
@@ -111,14 +110,7 @@ void BtAboutDialog::initTab(QTextBrowser *&tab) {
     font.setPointSize(font.pointSize()+2);
     tab->setFont(font);
     m_tabWidget->addTab(tab, "");
-    BT_CONNECT(tab, &QTextBrowser::anchorClicked,
-               [](QUrl const & url) {
-                   if (url.host() == "qt") {
-                       qApp->aboutQt();
-                   } else {
-                       QDesktopServices::openUrl(url);
-                   }
-               });
+    BT_CONNECT(tab, SIGNAL(anchorClicked(const QUrl&)), this, SLOT(linkClicked(const QUrl&)));
 }
 
 void BtAboutDialog::retranslateUi() {
@@ -139,8 +131,8 @@ void BtAboutDialog::retranslateBtTab() {
     QString content("<p>");
     content += tr("BibleTime is an easy to use but powerful Bible study tool.");
     content += "</p><p>";
-    content += tr("(c)1999-2021, The BibleTime Team");
-    content += "</p><p>" MAKE_LINK_STATIC("https://bibletime.info", "bibletime.info")
+    content += tr("(c)1999-2020, The BibleTime Team");
+    content += "</p><p>" MAKE_LINK_STATIC("http://www.bibletime.info", "www.bibletime.info")
                "</p>";
     m_bibletimeTab->setText(MAKE_HTML(m_bibletimeTab, content));
 }
@@ -200,11 +192,11 @@ void BtAboutDialog::retranslateContributorsTab() {
     ****************************************************************************************/
     content += tr("The following people translated BibleTime into their language:");
     content += "</b></p><ul>"
-                   "<li>Horatiu Alexe</li>"
                    "<li>Roy Alvear Aguirre</li>"
+                   "<li>Horatiu Alexe</li>"
                    "<li>Andrew Alfy</li>"
-                   "<li>Luis Barron</li>"
                    "<li>Jan B&#x11B;lohoubek</li>"
+                   "<li>Luis Barron</li>"
                    "<li>M&aacute;rio Castanheira</li>"
                    "<li>Chun-shek Chan</li>"
                    "<li>Ján Ďanovský</li>"
@@ -213,7 +205,9 @@ void BtAboutDialog::retranslateContributorsTab() {
                    "<li>Eeli Kaikkonen</li>"
                    "<li>Ilpo Kantonen</li>"
                    "<li>Pavel Laukko</li>"
+                   "<li>Johan van der Lingen</li>"
                    "<li>Piotr Markiewicz</li>"
+                   "<li>Konstantin Maslyuk</li>"
                    "<li>G&eacute;za Nov&aacute;k</li>"
                    "<li>Gabriel P&eacute;rez</li>"
                    "<li>Igor Plisco</li>"
@@ -221,15 +215,15 @@ void BtAboutDialog::retranslateContributorsTab() {
                    "<li>Jaak Ristioja</li>"
                    "<li>Igor Rykhlin</li>"
                    "<li>Vlad Savitsky</li>"
-                   "<li>Henrik Sonesson</li>"
-                   "<li>Johan van der Lingen</li>"
-                   "<li>Damian Wrzalski</li>"
-                   "<li>Konstantin Maslyuk</li>"
                    "<li>Jean Van Schaftingen</li>"
-                   "<li>Roland Teschner</li>"
+                   "<li>Flavio Theodor de Lima Silva</li>"
+                   "<li>Henrik Sonesson</li>"
                    "<li>Giovanni Tedaldi</li>"
+                   "<li>Roland Teschner</li>"
+                   "<li>Damian Wrzalski</li>"
                    "<li>Dmitry Yurevich</li>"
                    "<li>Esteban Zeller</li>"
+                   "<li>Aaron Zhou</li>"
                "</ul><p>";
     content += tr("Some names may be missing, please file an issue at %1 if "
                   "you notice errors or omissions.").arg(MAKE_LINK_STATIC(
@@ -298,5 +292,13 @@ void BtAboutDialog::retranslateLicenceTab() {
         content.replace("<!-- HEADER -->", MAKE_STYLE(m_licenceTab), Qt::CaseInsensitive);
         m_licenceTab->setText(content);
         licFile.close();
+    }
+}
+
+void BtAboutDialog::linkClicked(const QUrl &url) {
+    if (url.host() == "qt") {
+            qApp->aboutQt();
+    } else {
+        QDesktopServices::openUrl(url);
     }
 }

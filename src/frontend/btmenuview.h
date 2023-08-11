@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTMENUVIEW_H
+#define BTMENUVIEW_H
 
 #include <QMenu>
 
@@ -58,11 +59,11 @@ class BtMenuView: public QMenu {
           Returns a pointer to the data model associated with this menu.
           \retval 0 If this menu is not associated to any model.
         */
-        QAbstractItemModel * model() const { return m_model; }
+        inline QAbstractItemModel *model() const { return m_model; }
 
         bool event(QEvent * e) override;
 
-    Q_SIGNALS:
+    signals:
         /**
           This signal is emitted when the user activates a menu item corresponding to an
           index in the associated model.
@@ -125,3 +126,5 @@ class BtMenuView: public QMenu {
         QActionGroup *m_actions;
 
 };
+
+#endif // BTMENUVIEW_H

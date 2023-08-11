@@ -2,21 +2,20 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
-
 #include "btqmlinterface.h"
 
 #include <QApplication>
 #include <QClipboard>
+#include <QQuickItem>
 #include <QScreen>
 #include <QTimer>
-#include <utility>
 #include "../../../backend/config/btconfig.h"
 #include "../../../backend/drivers/cswordbookmoduleinfo.h"
 #include "../../../backend/drivers/cswordlexiconmoduleinfo.h"
@@ -27,8 +26,8 @@
 #include "../../../backend/managers/cswordbackend.h"
 #include "../../../backend/models/btmoduletextmodel.h"
 #include "../../../backend/rendering/btinforendering.h"
+#include "../../../backend/rendering/chtmlexportrendering.h"
 #include "../../../backend/rendering/cplaintextexportrendering.h"
-#include "../../../backend/rendering/ctextrendering.h"
 #include "../../../backend/rendering/btinforendering.h"
 #include "../../../util/btconnect.h"
 #include "../../bibletime.h"
@@ -48,15 +47,9 @@ BtQmlInterface::BtQmlInterface(QObject* parent)
     m_moduleTextModel->setTextFilter(&m_textFilter);
     m_textFilter.setShowReferences(true);
     m_linkTimer->setSingleShot(true);
+    m_findState.enabled = false;
 
-    BT_CONNECT(m_linkTimer, &QTimer::timeout,
-               [this] {
-                   auto infoList(Rendering::detectInfo(
-                                     getReferenceFromUrl(m_timeoutUrl)));
-                   if (!infoList.isEmpty())
-                       BibleTime::instance()->infoDisplay()->setInfo(
-                                   std::move(infoList));
-               });
+    BT_CONNECT(m_linkTimer, SIGNAL(timeout()), this, SLOT(timeoutEvent()));
 }
 
 BtQmlInterface::~BtQmlInterface() {
@@ -98,7 +91,7 @@ int BtQmlInterface::getContextMenuIndex() const {
 
 void BtQmlInterface::setContextMenuIndex(int index) {
     m_contextMenuIndex = index;
-    Q_EMIT contextMenuIndexChanged();
+    emit contextMenuIndexChanged();
 }
 
 int BtQmlInterface::getContextMenuColumn() const {
@@ -107,7 +100,7 @@ int BtQmlInterface::getContextMenuColumn() const {
 
 void BtQmlInterface::setContextMenuColumn(int index) {
     m_contextMenuColumn = index;
-    Q_EMIT contextMenuColumnChanged();
+    emit contextMenuColumnChanged();
 }
 
 QString BtQmlInterface::getActiveLink() const {
@@ -116,7 +109,7 @@ QString BtQmlInterface::getActiveLink() const {
 
 void BtQmlInterface::setActiveLink(const QString& link) {
     m_activeLink = link;
-    Q_EMIT activeLinkChanged();
+    emit activeLinkChanged();
 }
 
 QColor BtQmlInterface::getBackgroundColor() const {
@@ -149,9 +142,9 @@ int BtQmlInterface::getCurrentModelIndex() const {
         QString keyName = m_swordKey->key();
         key.setKey(keyName);
         CSwordTreeKey p(key);
-        p.positionToRoot();
+        p.root();
         if(p != key)
-            return static_cast<int>(key.offset() / 4u); /// \todo Check range!
+            return static_cast<int>(key.getIndex())/4;
     }
     else if (moduleIsLexicon(module())){
         const CSwordLexiconModuleInfo *li =
@@ -207,11 +200,16 @@ QString BtQmlInterface::getRawText(int row, int column) {
 
 void BtQmlInterface::openEditor(int row, int column) {
     BtEditTextWizard wiz;
-    wiz.setTitle(tr("Edit %1").arg(m_moduleTextModel->indexToKeyName(row)));
-    wiz.setText(getRawText(row, column));
-    wiz.setFont(m_fonts.at(column));
-    if (wiz.exec() == QDialog::Accepted)
-        setRawText(row, column, wiz.text());
+    QString keyName = m_moduleTextModel->indexToKeyName(row);
+    wiz.setTitle(tr("Edit") + " " + keyName);
+    wiz.setText(getRawText(row,column));
+    QFont font = m_fonts.at(column);
+    wiz.setFont(font);
+    int rtn = wiz.exec();
+    if (rtn == 0)
+        return;
+    setRawText(row, column, wiz.text());
+    return;
 }
 
 int BtQmlInterface::indexToVerse(int index) {
@@ -223,7 +221,7 @@ void BtQmlInterface::openContextMenu(int x, int y, int width) {
     int column = int(xRatio * m_moduleNames.count());
     if (column < 0 || column >= m_moduleNames.count())
         return;
-    Q_EMIT contextMenu(x, y, column);
+    emit contextMenu(x, y, column);
 }
 
 QString BtQmlInterface::getLemmaFromLink(const QString& url) {
@@ -303,18 +301,25 @@ void BtQmlInterface::setMagReferenceByUrl(const QString& url) {
     m_linkTimer->start(400);
 }
 
+void BtQmlInterface::timeoutEvent() {
+    QString link = getReferenceFromUrl(m_timeoutUrl);
+    Rendering::ListInfoData infoList(Rendering::detectInfo(link));
+    if (!(infoList.isEmpty()))
+        BibleTime::instance()->infoDisplay()->setInfo(infoList);
+}
+
 void BtQmlInterface::settingsChanged() {
     getFontsFromSettings();
     changeColorTheme();
-    Q_EMIT textChanged();
+    emit textChanged();
 }
 
 void BtQmlInterface::pageDown() {
-    Q_EMIT pageDownChanged();
+    emit pageDownChanged();
 }
 
 void BtQmlInterface::pageUp() {
-    Q_EMIT pageUpChanged();
+    emit pageUpChanged();
 }
 
 void BtQmlInterface::getFontsFromSettings() {
@@ -324,7 +329,10 @@ void BtQmlInterface::getFontsFromSettings() {
         QFont font;
         CSwordModuleInfo* m = CSwordBackend::instance()->findModuleByName(moduleName);
         if (m != nullptr) {
-            if (auto const lang = m->language()) {
+
+            const CLanguageMgr::Language* lang = m->language();
+            if (lang != nullptr) {
+
                 BtConfig::FontSettingsPair fontPair = btConfig().getFontForLanguage(*lang);
                 if (fontPair.first) {
                     font = fontPair.second;
@@ -334,7 +342,7 @@ void BtQmlInterface::getFontsFromSettings() {
             }
         }
         m_fonts.append(font);
-        Q_EMIT fontChanged();
+        emit fontChanged();
     }
 }
 
@@ -356,31 +364,31 @@ void BtQmlInterface::setKeyFromLink(const QString& link) {
 }
 
 void BtQmlInterface::scrollToSwordKey(CSwordKey * key) {
-    m_backgroundHighlightColorIndex = m_moduleTextModel->keyToIndex(*key);
+    m_backgroundHighlightColorIndex = m_moduleTextModel->keyToIndex(key);
 
     /* Convert from sword index to ListView index */
     m_backgroundHighlightColorIndex = m_backgroundHighlightColorIndex - m_moduleTextModel->getFirstEntryIndex();
 
-    Q_EMIT backgroundHighlightColorIndexChanged();
+    emit backgroundHighlightColorIndexChanged();
     m_swordKey = key;
-    Q_EMIT currentModelIndexChanged();
+    emit currentModelIndexChanged();
 }
 
 void BtQmlInterface::setModules(const QStringList &modules) {
     m_moduleNames = modules;
     m_moduleTextModel->setModules(modules);
     getFontsFromSettings();
-    Q_EMIT numModulesChanged();
+    emit numModulesChanged();
 }
 
 void BtQmlInterface::referenceChosen() {
-    Q_EMIT referenceChange();
-    Q_EMIT currentModelIndexChanged();
+    emit referenceChange();
+    emit currentModelIndexChanged();
 }
 
 void BtQmlInterface::changeReference(int i) {
     QString reference = m_moduleTextModel->indexToKeyName(i);
-    Q_EMIT updateReference(reference);
+    emit updateReference(reference);
 }
 
 void BtQmlInterface::dragHandler(int index, const QString& activeLink) {
@@ -399,7 +407,7 @@ void BtQmlInterface::dragHandler(int index, const QString& activeLink) {
         keyName = m_moduleTextModel->indexToKeyName(index);
     }
 
-    Q_EMIT dragOccuring(moduleName, keyName);
+    emit dragOccuring(moduleName, keyName);
 }
 
 const CSwordModuleInfo* BtQmlInterface::module() const {
@@ -437,8 +445,12 @@ QFont BtQmlInterface::getFont9() const { return font(9); }
 QString BtQmlInterface::getSelectedText() {
 
     QString text;
-    for (auto const & value : m_selectedText)
-        text.append(value).append('\n');
+    QMap<int, QString>::const_iterator i = m_selectedText.constBegin();
+    while (i != m_selectedText.constEnd()) {
+        text.append(i.value());
+        text.append('\n');
+        ++i;
+    }
     return text;
 }
 
@@ -451,9 +463,6 @@ QVariant BtQmlInterface::getTextModel() {
 BtModuleTextModel * BtQmlInterface::textModel() {
     return m_moduleTextModel;
 }
-
-BtModuleTextModel const * BtQmlInterface::textModel() const
-{ return m_moduleTextModel; }
 
 bool BtQmlInterface::moduleIsWritable(int column) {
     if (column >= m_moduleNames.count())
@@ -472,15 +481,33 @@ void BtQmlInterface::configModuleByType(const QString& type, const QStringList& 
     }
 }
 
-void BtQmlInterface::changeColorTheme() {
-    Q_EMIT backgroundHighlightColorChanged();
-    Q_EMIT backgroundColorChanged();
-    Q_EMIT foregroundColorChanged();
+RefIndexes BtQmlInterface::normalizeReferences(const QString& ref1, const QString& ref2) {
+    RefIndexes ri;
+    CSwordKey * key = m_swordKey->copy();
+    key->setKey(ref1);
+    QString x1 = key->key();
+    ri.index1 = m_moduleTextModel->keyToIndex(key);
+    key->setKey(ref2);
+    QString x2 = key->key();
+    ri.index2 = m_moduleTextModel->keyToIndex(key);
+    ri.r1 = ref1;
+    ri.r2 = ref2;
+    if (ri.index1 > ri.index2) {
+        ri.r1.swap(ri.r2);
+        std::swap(ri.index1, ri.index2);
+    }
+    return ri;
 }
 
-void BtQmlInterface::copyRange(int index1, int index2) const {
+void BtQmlInterface::changeColorTheme() {
+    emit backgroundHighlightColorChanged();
+    emit backgroundColorChanged();
+    emit foregroundColorChanged();
+}
+
+void BtQmlInterface::copyRange(int index1, int index2) {
     QString text;
-    std::unique_ptr<CSwordKey> key(m_swordKey->copy());
+    CSwordKey * key = m_swordKey->copy();
 
     for (int i=index1; i<=index2; ++i) {
         QString keyName = m_moduleTextModel->indexToKeyName(i);
@@ -489,9 +516,10 @@ void BtQmlInterface::copyRange(int index1, int index2) const {
     }
     QClipboard *clipboard = QGuiApplication::clipboard();
     clipboard->setText(text);
+    delete key;
 }
 
-void BtQmlInterface::copyVerseRange(const QString& ref1, const QString& ref2, const CSwordModuleInfo * module) const {
+void BtQmlInterface::copyVerseRange(const QString& ref1, const QString& ref2, const CSwordModuleInfo * module) {
     CSwordVerseKey dummy(module);
     CSwordVerseKey vk(module);
     dummy.setKey(ref1);
@@ -504,7 +532,7 @@ void BtQmlInterface::copyVerseRange(const QString& ref1, const QString& ref2, co
 
 bool BtQmlInterface::copyKey(CSwordKey const * const key,
                              Format const format,
-                             bool const addText) const
+                             bool const addText)
 {
     if (!key || !key->module())
         return false;
@@ -517,9 +545,11 @@ bool BtQmlInterface::copyKey(CSwordKey const * const key,
     CSwordVerseKey const * const vk =
             dynamic_cast<CSwordVerseKey const *>(key);
     if (vk && vk->isBoundSet()) {
-        text = render->renderKeyRange(vk->lowerBound(),
-                                      vk->upperBound(),
-                                      modules);
+        text = render->renderKeyRange(
+                    QString::fromUtf8(vk->getLowerBound()),
+                    QString::fromUtf8(vk->getUpperBound()),
+                    modules
+                    );
     } else {
         text = render->renderSingleKey(key->key(), modules);
     }
@@ -553,9 +583,9 @@ std::unique_ptr<Rendering::CTextRendering> BtQmlInterface::newRenderer(Format co
     using R = std::unique_ptr<Rendering::CTextRendering>;
     BT_ASSERT((format == Text) || (format == HTML));
     if (format == HTML)
-        return R{new Rendering::CTextRendering(addText,
-                                               displayOptions,
-                                               filterOptions)};
+        return R{new Rendering::CHTMLExportRendering(addText,
+                                                     displayOptions,
+                                                     filterOptions)};
     return R{new Rendering::CPlainTextExportRendering(addText,
                                                       displayOptions,
                                                       filterOptions)};
@@ -574,26 +604,29 @@ void BtQmlInterface::setHighlightWords(const QString& words, bool caseSensitive)
 void BtQmlInterface::slotSetHighlightWords() {
     QApplication::setOverrideCursor(Qt::WaitCursor);
     m_moduleTextModel->setHighlightWords(m_highlightWords, m_caseSensitive);
-    m_findState.reset();
+    m_findState.enabled = false;
     m_moduleTextModel->setFindState(m_findState);
-    Q_EMIT highlightWordsChanged();
+    emit highlightWordsChanged();
     QApplication::restoreOverrideCursor();
 }
 
 void BtQmlInterface::findText(const QString& /*text*/,
                               bool /*caseSensitive*/, bool backward) {
     QApplication::setOverrideCursor(Qt::WaitCursor);
-    if (!m_findState)
-        m_findState = FindState{getCurrentModelIndex(), 0};
+    if (! m_findState.enabled) {  // initialize it
+        m_findState.enabled = true;
+        m_findState.index = getCurrentModelIndex();
+        m_findState.subIndex = 0;
+    }
 
     if (backward)
-        getPreviousMatchingItem(m_findState->index);
+        getPreviousMatchingItem(m_findState.index);
     else
-        getNextMatchingItem(m_findState->index);
+        getNextMatchingItem(m_findState.index);
 
     m_moduleTextModel->setFindState(m_findState);
-    Q_EMIT highlightWordsChanged();
-    Q_EMIT positionItemOnScreen(m_findState->index);
+    emit highlightWordsChanged();
+    emit positionItemOnScreen(m_findState.index);
     QApplication::restoreOverrideCursor();
 }
 
@@ -606,9 +639,9 @@ int BtQmlInterface::countHighlightsInItem(int index) {
 
 void BtQmlInterface::getNextMatchingItem(int startIndex) {
     int num = countHighlightsInItem(startIndex);
-    if (num > m_findState->subIndex) { // Found within startIndex item
-        m_findState->index = startIndex;
-        ++m_findState->subIndex;
+    if (num > m_findState.subIndex) { // Found within startIndex item
+        m_findState.index = startIndex;
+        ++m_findState.subIndex;
         return;
     }
 
@@ -619,8 +652,8 @@ void BtQmlInterface::getNextMatchingItem(int startIndex) {
     for (int i = 0; i < 1000; ++i) {
         int num = countHighlightsInItem(index);
         if (num > 0 ) {
-            m_findState->index = index;
-            m_findState->subIndex = 1;
+            m_findState.index = index;
+            m_findState.subIndex = 1;
             return;
         }
         ++index;
@@ -630,10 +663,10 @@ void BtQmlInterface::getNextMatchingItem(int startIndex) {
 
 void BtQmlInterface::getPreviousMatchingItem(int startIndex) {
     int num = countHighlightsInItem(startIndex);
-    if (num > 0 && m_findState->subIndex == 0) {
+    if (num > 0 && m_findState.subIndex == 0) {
         // Found within startIndex item
-        m_findState->index = startIndex;
-        m_findState->subIndex = 1;
+        m_findState.index = startIndex;
+        m_findState.subIndex = 1;
         return;
     }
 
@@ -641,17 +674,17 @@ void BtQmlInterface::getPreviousMatchingItem(int startIndex) {
         return;
 
     int index = startIndex;
-    if (m_findState->subIndex == 0)
+    if (m_findState.subIndex == 0)
         --index;
     for (int i = 0; i < 1000; ++i) {
         int num = countHighlightsInItem(index);
         if (num > 0 ) {
-            m_findState->index = index;
-            if (m_findState->subIndex == 0)
-                m_findState->subIndex = num;
+            m_findState.index = index;
+            if (m_findState.subIndex == 0)
+                m_findState.subIndex = num;
             else
-                --m_findState->subIndex;
-            if (m_findState->subIndex != 0)
+                --m_findState.subIndex;
+            if (m_findState.subIndex != 0)
                 return;
         }
         --index;
@@ -675,3 +708,12 @@ bool BtQmlInterface::shiftKeyDown() {
     return QGuiApplication::keyboardModifiers() & Qt::ShiftModifier;
 }
 
+void BtQmlInterface::setBoundsMovement() {
+#if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
+    QQuickItem* displayListView = parent()->findChild<QQuickItem*>("DisplayListView");
+    if (displayListView != nullptr) {
+        int StopAtBounds = 0;
+        displayListView->setProperty("boundsMovement", StopAtBounds);
+    }
+#endif
+}

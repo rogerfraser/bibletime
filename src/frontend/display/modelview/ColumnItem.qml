@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -21,7 +21,7 @@ Item {
     property color textColor: btQmlInterface.foregroundColor
     property color textBackgroundColor: btQmlInterface.backgroundColor
     property color textBackgroundHighlightColor: btQmlInterface.backgroundHighlightColor
-    required property font font
+    property font font
 
     signal hovered(string link);
     signal setSelection(bool selected, int selectFirstIndex, int selectLastIndex, int posFirst, int posLast)

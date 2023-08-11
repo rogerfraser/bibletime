@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTICONS_H
+#define BTICONS_H
 
 #include <QIcon>
 #include <QString>
@@ -41,9 +42,9 @@ public: /* Methods: */
 
     BtIcons();
 
-    static BtIcons & instance() {
+    static inline BtIcons & instance() { 
         BT_ASSERT(m_instance);
-        return *m_instance;
+        return *m_instance; 
     }
 
 private: /* Fields: */
@@ -146,3 +147,5 @@ public: /* Fields: */
 };
 
 QString iconToHtml(QIcon const & icon, int const extent = 32);
+
+#endif /* BTICONS_H */

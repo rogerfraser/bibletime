@@ -2,15 +2,13 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
-
-#pragma once
 
 #include "../btmenuview.h"
 
@@ -55,7 +53,7 @@ public: /* Methods: */
 
     int buttonIndex() const noexcept { return m_buttonIndex; }
 
-Q_SIGNALS:
+signals:
 
     void sigModuleChosen(CSwordModuleInfo * module);
 
@@ -71,6 +69,7 @@ public: /* Fields: */
     CSwordModuleInfo::ModuleType const m_moduleType;
     void * const m_sortedModel;
     Flags const m_flags;
+    QAction * m_noneAction;
     QStringList m_newModulesToUse;
     QString m_selectedModule;
     int m_buttonIndex;

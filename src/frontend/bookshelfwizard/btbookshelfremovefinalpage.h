@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTBOOKSHELFREMOVEFINALPAGE
+#define BTBOOKSHELFREMOVEFINALPAGE
 
 #include "btbookshelfwizardpage.h"
 
@@ -28,7 +29,7 @@ class BtBookshelfRemoveFinalPage final: public BtBookshelfWizardPage {
 
 public: /* Methods: */
 
-    BtBookshelfRemoveFinalPage(QWidget * parent = nullptr);
+    BtBookshelfRemoveFinalPage(QWidget * parent = 0);
 
     bool isComplete() const final override;
     void initializePage() final override;
@@ -44,3 +45,5 @@ private: /* Fields: */
     QVBoxLayout * m_verticalLayout;
 
 }; /* class BtBookshelfRemoveFinalPage */
+
+#endif

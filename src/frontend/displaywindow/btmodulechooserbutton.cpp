@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -99,17 +99,17 @@ void BtModuleChooserButton::moduleChosen(
         if (newModule) {
             m_popup->setSelectedModule(newModule->name());
             setIcon(newModule->moduleIcon());
-            Q_EMIT sigModuleAdd(m_popup->buttonIndex(), newModule->name());
+            emit sigModuleAdd(m_popup->buttonIndex(), newModule->name());
         }
     } else {
         if (newModule) {
             m_popup->setSelectedModule(newModule->name());
             setIcon(newModule->moduleIcon());
-            Q_EMIT sigModuleReplace(m_popup->buttonIndex(), newModule->name());
+            emit sigModuleReplace(m_popup->buttonIndex(), newModule->name());
         } else {
             m_popup->setSelectedModule(QString());
             setIcon(icon());
-            Q_EMIT sigModuleRemove(m_popup->buttonIndex());
+            emit sigModuleRemove(m_popup->buttonIndex());
         }
     }
 }

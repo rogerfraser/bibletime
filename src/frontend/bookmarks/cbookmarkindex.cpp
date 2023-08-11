@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -23,7 +23,6 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPaintEvent>
-#include <QScopeGuard>
 #include <QTimer>
 #include <QToolTip>
 #include "../../backend/config/btconfig.h"
@@ -33,6 +32,7 @@
 #include "../../util/btassert.h"
 #include "../../util/btconnect.h"
 #include "../../util/bticons.h"
+#include "../../util/btscopeexit.h"
 #include "../../util/cresmgr.h"
 #include "../../util/tool.h"
 #include "../../util/directory.h"
@@ -93,235 +93,74 @@ CBookmarkIndex::CBookmarkIndex(QWidget * const parent)
     //setup the popup menu
     m_popup = new QMenu{viewport()};
     m_popup->setTitle(tr("Bookmarks"));
-    auto const addMenuAction =
-            [this](MenuAction const menuAction,
-                   QString const & text,
-                   QIcon const & pix,
-                   auto && slot)
-            {
-                auto * const action = new QAction(pix, text, this);
-                BT_CONNECT(action, &QAction::triggered,
-                           std::forward<decltype(slot)>(slot));
-                m_actions[menuAction] = action;
-                m_popup->addAction(action);
-            };
-    namespace MI = CResMgr::mainIndex;
-    addMenuAction(NewFolder, tr("New folder"), MI::newFolder::icon(),
-                  [this]{
-                      if (!selectedIndexes().empty()) {
-                          if (m_bookmarksModel->isFolder(currentIndex()))
-                              setCurrentIndex(
-                                          m_bookmarksModel->addFolder(
-                                              m_bookmarksModel->rowCount(
-                                                  currentIndex()),
-                                              currentIndex()));
-                      } else { // create a top level folder
-                          setCurrentIndex(
-                                  m_bookmarksModel->addFolder(
-                                          m_bookmarksModel->rowCount() - 1,
-                                          QModelIndex()));
-                      }
-                  });
-    addMenuAction(ChangeFolder, tr("Rename folder"), MI::changeFolder::icon(),
-                  [this]{
-                      BT_ASSERT(m_bookmarksModel->isFolder(currentIndex()));
-                      edit(currentIndex());
-                  });
-    m_popup->addSeparator();
-    addMenuAction(EditBookmark, tr("Edit bookmark..."),
-                  MI::editBookmark::icon(),
-                  [this]{
-                      QModelIndex const index = currentIndex();
-                      BT_ASSERT(m_bookmarksModel->isBookmark(index));
-                      auto * const module = m_bookmarksModel->module(index);
-                      BtEditBookmarkDialog d(
-                              QString::fromLatin1("%1 (%2)")
-                                  .arg(m_bookmarksModel->key(index))
-                                  .arg(module
-                                       ? module->name()
-                                       : QObject::tr("unknown")),
-                              index.data().toString(),
-                              m_bookmarksModel->description(index),
-                              this);
-                      if (d.exec() == QDialog::Accepted) {
-                          m_bookmarksModel->setData(index, d.titleText());
-                          m_bookmarksModel->setDescription(index,
-                                                           d.descriptionText());
-                      }
-                  });
-    addMenuAction(SortFolderBookmarks, tr("Sort folder bookmarks..."),
-                  MI::sortFolderBookmarks::icon(),
-                  [this]{
-                      BT_ASSERT(m_bookmarksModel->isFolder(currentIndex()));
-                      m_bookmarksModel->sortItems(currentIndex());
-                  });
-    addMenuAction(SortAllBookmarks, tr("Sort all bookmarks..."),
-                  MI::sortAllBookmarks::icon(),
-                  [this]{
-                      m_bookmarksModel->sortItems();
-                      auto const numRows = m_bookmarksModel->rowCount();
-                      if (m_extraItem.row() != numRows - 1) {
-                          m_bookmarksModel->removeRow(m_extraItem.row(),
-                                                      m_extraItem.parent());
-                          if (m_bookmarksModel->insertRows(numRows - 1, 1))
-                              m_extraItem =
-                                      m_bookmarksModel->index(numRows - 1, 0);
-                      }
-                  });
-    addMenuAction(ImportBookmarks, tr("Import to folder..."),
-                  MI::importBookmarks::icon(),
-                  [this]{
-                      BT_ASSERT(m_bookmarksModel->isFolder(currentIndex()));
-                      QString const fileName =
-                              QFileDialog::getOpenFileName(
-                                      nullptr,
-                                      QObject::tr("Import bookmarks"),
-                                      "",
-                                      fileDialogFilter());
-                      if (!fileName.isEmpty())
-                          m_bookmarksModel->load(fileName, currentIndex());
-                  });
-    addMenuAction(ExportBookmarks, tr("Export from folder..."),
-                  MI::exportBookmarks::icon(),
-                  [this]{
-                      BT_ASSERT(m_bookmarksModel->isFolder(currentIndex()));
-                      QString const fileName =
-                              QFileDialog::getSaveFileName(
-                                  nullptr,
-                                  QObject::tr("Export Bookmarks"),
-                                  "",
-                                  fileDialogFilter());
-                      if (!fileName.isEmpty())
-                          m_bookmarksModel->save(fileName, currentIndex());
-                  });
-    addMenuAction(PrintBookmarks, tr("Print bookmarks..."),
-                  MI::printBookmarks::icon(),
-                  [this]{
-                      BT_ASSERT(hasBookmarksRecursively(selectedIndexes()));
-                      BtPrinter::KeyTree tree;
-                      {
-                          BtPrinter::KeyTreeItem::Settings const settings{
-                              false,
-                              BtPrinter::KeyTreeItem::Settings::CompleteShort};
-                          QModelIndexList items(selectedIndexes());
-                          while (!items.empty()) {
-                              QModelIndex const index(items.takeFirst());
-                              if (m_bookmarksModel->isBookmark(index)) {
-                                  tree.emplace_back(
-                                              m_bookmarksModel->key(index),
-                                              m_bookmarksModel->module(index),
-                                              settings);
-                              } else if (m_bookmarksModel->isFolder(index)) {
-                                  int const numChildren =
-                                          m_bookmarksModel->rowCount(index);
-                                  for (int i = 0; i < numChildren; i++)
-                                      items.append(index.model()->index(i,
-                                                                        0,
-                                                                        index));
-                              }
-                          }
-                      }
-                      BT_ASSERT(!tree.empty());
 
-                      BtPrinter{btConfig().getDisplayOptions(),
-                                btConfig().getFilterOptions(),
-                                this}.printKeyTree(tree);
-                  });
-    m_popup->addSeparator();
-    addMenuAction(DeleteEntries, tr("Remove selected items..."),
-                  MI::deleteItems::icon(),
-                  [this]{
-                      if (message::showQuestion(
-                              this,
-                              tr("Delete Items"),
-                              tr("Do you really want to delete the selected "
-                                 "items and folders?"),
-                              QMessageBox::Yes | QMessageBox::No,
-                              QMessageBox::No) == QMessageBox::Yes)
-                          deleteEntries();
-                  });
+    auto const newQAction = [this](QString const & text,
+                                   QIcon const & pix,
+                                   char const * const slot)
+    {
+        QAction * const action = new QAction{pix, text, this};
+        BT_CONNECT(action, SIGNAL(triggered()), this, slot);
+        return action;
+    };
+
+    namespace MI = CResMgr::mainIndex;
+    m_actions[NewFolder] = newQAction(tr("New folder"),
+                                      MI::newFolder::icon(),
+                                      SLOT(createNewFolder()));
+    m_actions[ChangeFolder] = newQAction(tr("Rename folder"),
+                                         MI::changeFolder::icon(),
+                                         SLOT(changeFolder()));
+    m_actions[EditBookmark] = newQAction(tr("Edit bookmark..."),
+                                         MI::editBookmark::icon(),
+                                         SLOT(editBookmark()));
+    /// \todo Add icons for sorting bookmarks
+    m_actions[SortFolderBookmarks] = newQAction(tr("Sort folder bookmarks..."),
+                                                MI::sortFolderBookmarks::icon(),
+                                                SLOT(sortFolderBookmarks()));
+    m_actions[SortAllBookmarks] = newQAction(tr("Sort all bookmarks..."),
+                                             MI::sortAllBookmarks::icon(),
+                                             SLOT(sortAllBookmarks()));
+    m_actions[ImportBookmarks] = newQAction(tr("Import to folder..."),
+                                            MI::importBookmarks::icon(),
+                                            SLOT(importBookmarks()));
+    m_actions[ExportBookmarks] = newQAction(tr("Export from folder..."),
+                                            MI::exportBookmarks::icon(),
+                                            SLOT(exportBookmarks()));
+    m_actions[PrintBookmarks] = newQAction(tr("Print bookmarks..."),
+                                           MI::printBookmarks::icon(),
+                                           SLOT(printBookmarks()));
+
+    m_actions[DeleteEntries] = newQAction(tr("Remove selected items..."),
+                                          MI::deleteItems::icon(),
+                                          SLOT(confirmDeleteEntries()));
+
+    // Fill the popup menu:
+    auto const createSeparator = [this]{
+        QAction * const separator = new QAction{this};
+        separator->setSeparator(true);
+        return separator;
+    };
+    m_popup->addAction(m_actions[NewFolder]);
+    m_popup->addAction(m_actions[ChangeFolder]);
+    m_popup->addAction(createSeparator());
+    m_popup->addAction(m_actions[EditBookmark]);
+    m_popup->addAction(m_actions[SortFolderBookmarks]);
+    m_popup->addAction(m_actions[SortAllBookmarks]);
+    m_popup->addAction(m_actions[ImportBookmarks]);
+    m_popup->addAction(m_actions[ExportBookmarks]);
+    m_popup->addAction(m_actions[PrintBookmarks]);
+    m_popup->addAction(createSeparator());
+    m_popup->addAction(m_actions[DeleteEntries]);
+
 
     //--------------------------------------------------------------------------
     // Initialize connections:
 
-    BT_CONNECT(this, &CBookmarkIndex::activated,
-               [this](QModelIndex const & index) {
-                   /** \note HACK: checking the modifier keys from the last
-                             mouseReleaseEvent depends on executing order:
-                             mouseReleaseEvent first, then itemClicked signal.*/
-                   auto const modifiers = m_mouseReleaseEventModifiers;
-                   m_mouseReleaseEventModifiers = Qt::NoModifier;
-                   if (modifiers != Qt::NoModifier || !index.isValid())
-                       return;
-
-                   // Clicked on a bookmark:
-                   if (m_bookmarksModel->isBookmark(index))
-                       if (auto * const mod = m_bookmarksModel->module(index))
-                           Q_EMIT createReadDisplayWindow(
-                                   QList<CSwordModuleInfo *>() << mod,
-                                   m_bookmarksModel->key(index));
-               });
-    BT_CONNECT(this, &CBookmarkIndex::customContextMenuRequested,
-               [this](QPoint const & p) {
-                   // Enable actions based on the selected items (if any):
-                   QModelIndex const i(indexAt(p));
-                   QModelIndexList const items(selectedIndexes());
-                   if (items.isEmpty()) { // Special handling for no selection:
-                       for (int index = ActionBegin; index < ActionEnd; ++index)
-                           m_actions[index]->setEnabled(
-                                       (index == NewFolder)
-                                       || (index == SortAllBookmarks));
-                   } else if (items.count() == 1) {
-                       // Special handling for one selected item:
-                       for (int index = ActionBegin; index < ActionEnd; ++index)
-                           m_actions[index]->setEnabled(
-                               enableAction(items.at(0),
-                                            static_cast<MenuAction>(index)));
-                   } else if (!i.isValid()) {
-                       // Disable all actions for invalid index:
-                       for (int index = ActionBegin; index < ActionEnd; ++index)
-                           m_actions[index]->setEnabled(false);
-                   } else {
-                       // Enable actions depending on the the selected items:
-                       for (int index = ActionBegin; index < ActionEnd; ++index)
-                           m_actions[index]->setEnabled(
-                                   (index == DeleteEntries)
-                                   || ((index == PrintBookmarks)
-                                       && hasBookmarksRecursively(items)));
-                   }
-                   m_popup->exec(mapToGlobal(p));
-               });
-    BT_CONNECT(&m_magTimer, &QTimer::timeout,
-               [this]{
-                   if (!underMouse())
-                       return;
-
-                   /* Update the Mag only if the mouse pointer have been over
-                      the same item since the timer was started. */
-                   QModelIndex const itemUnderPointer(
-                               indexAt(mapFromGlobal(QCursor::pos())));
-                   if (itemUnderPointer.isValid()
-                       && m_previousEventItem == itemUnderPointer
-                       && m_bookmarksModel->isBookmark(itemUnderPointer))
-                   {
-                       BT_ASSERT(BibleTime::instance()->infoDisplay());
-                       InfoDisplay::CInfoDisplay & infoDisplay =
-                               *(BibleTime::instance()->infoDisplay());
-                       if (CSwordModuleInfo const * const module =
-                                   m_bookmarksModel->module(itemUnderPointer))
-                       {
-                           infoDisplay.setInfo(
-                               Rendering::CrossReference,
-                               module->name() + ":"
-                               + m_bookmarksModel->key(itemUnderPointer));
-                       } else {
-                           infoDisplay.setInfo(
-                                       Rendering::Text,
-                                       tr("The work to which the bookmark "
-                                          "points to is not installed."));
-                       }
-                   }
-               });
+    BT_CONNECT(this, SIGNAL(activated(QModelIndex const &)),
+               this, SLOT(slotExecuted(QModelIndex const &)));
+    BT_CONNECT(this, SIGNAL(customContextMenuRequested(QPoint const &)),
+               this, SLOT(contextMenu(QPoint const &)));
+    BT_CONNECT(&m_magTimer, SIGNAL(timeout()), this, SLOT(magTimeout()));
 
     //--------------------------------------------------------------------------
     // Initialize tree:
@@ -341,11 +180,28 @@ void CBookmarkIndex::mouseReleaseEvent(QMouseEvent* event) {
     QTreeView::mouseReleaseEvent(event);
 }
 
+/** Called when an item is clicked with mouse or activated with keyboard. */
+void CBookmarkIndex::slotExecuted( const QModelIndex &index ) {
+    /** \note HACK: checking the modifier keys from the last mouseReleaseEvent
+                    depends on executing order: mouseReleaseEvent first, then
+                    itemClicked signal. */
+    auto const modifiers = m_mouseReleaseEventModifiers;
+    m_mouseReleaseEventModifiers = Qt::NoModifier;
+    if (modifiers != Qt::NoModifier || !index.isValid())
+        return;
+
+    // Clicked on a bookmark:
+    if (m_bookmarksModel->isBookmark(index))
+        if (CSwordModuleInfo * const mod = m_bookmarksModel->module(index))
+            emit createReadDisplayWindow(QList<CSwordModuleInfo *>() << mod,
+                                         m_bookmarksModel->key(index));
+}
+
 /** Creates a drag mime data object for the current selection. */
 QMimeData * CBookmarkIndex::dragObject() {
     BTMimeData * const mimeData = new BTMimeData{};
 
-    for (auto const & widgetItem : selectedIndexes()) {
+    Q_FOREACH(QModelIndex const & widgetItem, selectedIndexes()) {
         if (!widgetItem.isValid())
             break;
         if (m_bookmarksModel->isBookmark(widgetItem)) {
@@ -449,11 +305,13 @@ void CBookmarkIndex::paintEvent(QPaintEvent * event) {
 
 void CBookmarkIndex::dropEvent(QDropEvent * event) {
     // Try to prevent annoying timed autocollapsing:
-    auto const connection =
-            BT_CONNECT(this, &CBookmarkIndex::collapsed,
-                       [this](QModelIndex const & index) { expand(index); });
-    auto cleanup = qScopeGuard([this, &connection]() noexcept
-                               { disconnect(connection); });
+    BT_CONNECT(this, SIGNAL(collapsed(QModelIndex const &)),
+               this, SLOT(expandAutoCollapsedItem(QModelIndex const &)));
+    BT_SCOPE_EXIT(
+        QObject::disconnect(
+                this, SIGNAL(collapsed(QModelIndex const &)),
+                this, SLOT(expandAutoCollapsedItem(QModelIndex const &)));
+    );
     QModelIndex const index = indexAt(event->pos());
     QModelIndex parentIndex;
     int indexUnderParent = 0;
@@ -514,7 +372,7 @@ void CBookmarkIndex::dropEvent(QDropEvent * event) {
         QModelIndexList const list = selectedIndexes();
         QModelIndexList newList;
 
-        for (auto const & index : list) {
+        Q_FOREACH(QModelIndex const & index, list) {
             if (m_bookmarksModel->isFolder(index)) {
                 bookmarksOnly = false;
                 // Only one item allowed if a folder is selected:
@@ -616,15 +474,163 @@ void CBookmarkIndex::leaveEvent(QEvent * event) {
     QTreeView::leaveEvent(event);
 }
 
+/** Shows the context menu at the given position. */
+void CBookmarkIndex::contextMenu(QPoint const & p) {
+    // Enable actions based on the selected items (if any):
+    QModelIndex const i = indexAt(p);
+    QModelIndexList const items = selectedIndexes();
+    if (items.isEmpty()) { // Special handling for no selection:
+        for (int index = ActionBegin; index < ActionEnd; ++index)
+            m_actions[index]->setEnabled((index == NewFolder)
+                                         || (index == SortAllBookmarks));
+    } else if (items.count() == 1) { // Special handling for one selected item:
+        for (int index = ActionBegin; index < ActionEnd; ++index)
+            m_actions[index]->setEnabled(
+                enableAction(items.at(0), static_cast<MenuAction>(index)));
+    } else if (!i.isValid()) { // Disable all actions for invalid index:
+        for (int index = ActionBegin; index < ActionEnd; ++index)
+            m_actions[index]->setEnabled(false);
+    } else { // Enable actions depending on the the selected items:
+        for (int index = ActionBegin; index < ActionEnd; ++index)
+            m_actions[index]->setEnabled(
+                    (index == DeleteEntries)
+                    || ((index == PrintBookmarks)
+                        && hasBookmarksRecursively(items)));
+    }
+    m_popup->exec(mapToGlobal(p));
+}
+
+/** Adds a new subfolder to the current item. */
+void CBookmarkIndex::createNewFolder() {
+    if (!selectedIndexes().empty()) {
+        if (m_bookmarksModel->isFolder(currentIndex()))
+            setCurrentIndex(m_bookmarksModel->addFolder(
+                                    m_bookmarksModel->rowCount(currentIndex()),
+                                    currentIndex()));
+    } else { // create a top level folder
+        setCurrentIndex(
+                m_bookmarksModel->addFolder(m_bookmarksModel->rowCount() - 1,
+                                            QModelIndex{}));
+    }
+}
+
+/** Opens a dialog to change the current folder. */
+void CBookmarkIndex::changeFolder() {
+    BT_ASSERT(m_bookmarksModel->isFolder(currentIndex()));
+    edit(currentIndex());
+}
+
+/** Edits the current bookmark. */
+void CBookmarkIndex::editBookmark() {
+    QModelIndex const index = currentIndex();
+    BT_ASSERT(m_bookmarksModel->isBookmark(index));
+    CSwordModuleInfo * const module = m_bookmarksModel->module(index);
+    BtEditBookmarkDialog d{
+            QString::fromLatin1("%1 (%2)").arg(m_bookmarksModel->key(index))
+                                          .arg(module
+                                               ? module->name()
+                                               : QObject::tr("unknown")),
+            index.data().toString(),
+            m_bookmarksModel->description(index),
+            this};
+    if (d.exec() == QDialog::Accepted) {
+        m_bookmarksModel->setData(index, d.titleText());
+        m_bookmarksModel->setDescription(index, d.descriptionText());
+    }
+}
+
+/** Sorts the current folder bookmarks. */
+void CBookmarkIndex::sortFolderBookmarks() {
+    BT_ASSERT(m_bookmarksModel->isFolder(currentIndex()));
+    m_bookmarksModel->sortItems(currentIndex());
+}
+
+/** Sorts all bookmarks. */
+void CBookmarkIndex::sortAllBookmarks() {
+    m_bookmarksModel->sortItems();
+    if (m_extraItem.row() != m_bookmarksModel->rowCount() - 1) {
+        m_bookmarksModel->removeRow(m_extraItem.row(), m_extraItem.parent());
+        if (m_bookmarksModel->insertRows(m_bookmarksModel->rowCount(), 1))
+            m_extraItem = m_bookmarksModel->index(m_bookmarksModel->rowCount() - 1, 0);
+    }
+}
+
+/** Exports the bookmarks being in the selected folder. */
+void CBookmarkIndex::exportBookmarks() {
+    BT_ASSERT(m_bookmarksModel->isFolder(currentIndex()));
+    QString const fileName =
+            QFileDialog::getSaveFileName(
+                nullptr,
+                QObject::tr("Export Bookmarks"),
+                "",
+                fileDialogFilter());
+    if (!fileName.isEmpty())
+        m_bookmarksModel->save(fileName, currentIndex());
+}
+
+/** Import bookmarks from a file and add them to the selected folder. */
+void CBookmarkIndex::importBookmarks() {
+    BT_ASSERT(m_bookmarksModel->isFolder(currentIndex()));
+    QString const fileName =
+            QFileDialog::getOpenFileName(
+                    nullptr,
+                    QObject::tr("Import bookmarks"),
+                    "",
+                    fileDialogFilter());
+    if (!fileName.isEmpty())
+        m_bookmarksModel->load(fileName, currentIndex());
+}
+
+/** Prints the selected bookmarks. */
+void CBookmarkIndex::printBookmarks() {
+    BT_ASSERT(hasBookmarksRecursively(selectedIndexes()));
+    BtPrinter::KeyTree tree;
+    {
+        BtPrinter::KeyTreeItem::Settings const settings{
+                false,
+                BtPrinter::KeyTreeItem::Settings::CompleteShort};
+        QModelIndexList items(selectedIndexes());
+        while (!items.empty()) {
+            QModelIndex const index(items.takeFirst());
+            if (m_bookmarksModel->isBookmark(index)) {
+                tree.append(
+                        new BtPrinter::KeyTreeItem{
+                                m_bookmarksModel->key(index),
+                                m_bookmarksModel->module(index),
+                                settings});
+            } else if (m_bookmarksModel->isFolder(index)) {
+                int const numChildren = m_bookmarksModel->rowCount(index);
+                for (int i = 0; i < numChildren; i++)
+                    items.append(index.model()->index(i, 0, index));
+            }
+        }
+    }
+    BT_ASSERT(!tree.isEmpty());
+
+    BtPrinter{btConfig().getDisplayOptions(),
+              btConfig().getFilterOptions(),
+              this}.printKeyTree(tree);
+}
+
+void CBookmarkIndex::confirmDeleteEntries() {
+    if (message::showQuestion(
+            this,
+            tr("Delete Items"),
+            tr("Do you really want to delete the selected items and folders?"),
+            QMessageBox::Yes | QMessageBox::No,
+            QMessageBox::No) == QMessageBox::Yes)
+        deleteEntries();
+}
+
 void CBookmarkIndex::deleteEntries() {
     /* We need to use QPersistentModelIndex because after removeRows QModelIndex
        will be invalidated. Need to delete per index because selected indexes
        might be under different parents. */
     QList<QPersistentModelIndex> list;
-    for (auto const & i : selectedIndexes())
+    Q_FOREACH(QModelIndex const & i, selectedIndexes())
         list.append(i);
 
-    for (auto const & i : list)
+    Q_FOREACH(QModelIndex const & i, list)
         model()->removeRows(i.row(), 1, i.parent());
 }
 
@@ -664,4 +670,32 @@ void CBookmarkIndex::mouseMoveEvent(QMouseEvent * event) {
     update();
 
     QTreeView::mouseMoveEvent(event);
+}
+
+void CBookmarkIndex::magTimeout() {
+    if (!underMouse())
+        return;
+
+    /* Update the Mag only if the mouse pointer have been over the same item
+       since the timer was started. */
+    QModelIndex const itemUnderPointer{indexAt(mapFromGlobal(QCursor::pos()))};
+    if (itemUnderPointer.isValid()
+        && m_previousEventItem == itemUnderPointer
+        && m_bookmarksModel->isBookmark(itemUnderPointer))
+    {
+        BT_ASSERT(BibleTime::instance()->infoDisplay());
+        InfoDisplay::CInfoDisplay & infoDisplay =
+                *(BibleTime::instance()->infoDisplay());
+        if (CSwordModuleInfo const * const module =
+                    m_bookmarksModel->module(itemUnderPointer))
+        {
+            infoDisplay.setInfo(
+                Rendering::CrossReference,
+                module->name() + ":" + m_bookmarksModel->key(itemUnderPointer));
+        } else {
+            infoDisplay.setInfo(Rendering::Text,
+                                tr("The work to which the bookmark points to "
+                                   "is not installed."));
+        }
+    }
 }

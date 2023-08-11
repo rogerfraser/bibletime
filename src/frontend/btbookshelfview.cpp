@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -32,14 +32,10 @@ BtBookshelfView::BtBookshelfView(QWidget *parent)
     */
     // setRootIsDecorated(false);
 
-    BT_CONNECT(this, &BtBookshelfView::activated,
-               [this](QModelIndex const & index) {
-                   if (auto * const module = getModule(index))
-                       Q_EMIT moduleActivated(module);
-               });
-    BT_CONNECT(this, &BtBookshelfView::entered,
-               [this](QModelIndex const & index)
-               { Q_EMIT moduleHovered(getModule(index)); });
+    BT_CONNECT(this, SIGNAL(activated(QModelIndex)),
+               this, SLOT(slotItemActivated(QModelIndex)));
+    BT_CONNECT(this, SIGNAL(entered(QModelIndex)),
+               this, SLOT(slotItemHovered(QModelIndex)));
 }
 
 CSwordModuleInfo * BtBookshelfView::getModule(const QModelIndex & index) const {
@@ -57,10 +53,10 @@ void BtBookshelfView::keyPressEvent(QKeyEvent *event) {
                 QRect itemRect(visualRect(currentIndex()));
                 QPoint p(viewport()->mapToGlobal(itemRect.bottomLeft()));
                 if (i == nullptr) {
-                    Q_EMIT contextMenuActivated(p);
+                    emit contextMenuActivated(p);
                 }
                 else {
-                    Q_EMIT moduleContextMenuActivated(i, p);
+                    emit moduleContextMenuActivated(i, p);
                 }
             }
             event->accept();
@@ -70,7 +66,7 @@ void BtBookshelfView::keyPressEvent(QKeyEvent *event) {
             QModelIndex i(currentIndex());
             CSwordModuleInfo *m(getModule(i));
             if (m != nullptr) {
-                Q_EMIT moduleActivated(m);
+                emit moduleActivated(m);
             }
             else {
                 setExpanded(i, !isExpanded(i));
@@ -92,14 +88,25 @@ void BtBookshelfView::mousePressEvent(QMouseEvent *event) {
         }
         CSwordModuleInfo *i(getModule(clickedItemIndex));
         if (i == nullptr) {
-            Q_EMIT contextMenuActivated(mapToGlobal(event->pos()));
+            emit contextMenuActivated(mapToGlobal(event->pos()));
         }
         else {
-            Q_EMIT moduleContextMenuActivated(i, mapToGlobal(event->pos()));
+            emit moduleContextMenuActivated(i, mapToGlobal(event->pos()));
         }
         event->accept();
     }
     else {
         QTreeView::mousePressEvent(event);
     }
+}
+
+void BtBookshelfView::slotItemActivated(const QModelIndex &index) {
+    CSwordModuleInfo *i(getModule(index));
+    if (i != nullptr) {
+        emit moduleActivated(i);
+    }
+}
+
+void BtBookshelfView::slotItemHovered(const QModelIndex &index) {
+    emit moduleHovered(getModule(index));
 }

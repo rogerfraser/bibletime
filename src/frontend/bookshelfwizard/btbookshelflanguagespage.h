@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTBOOKSHELFLANGUAGESPAGE
+#define BTBOOKSHELFLANGUAGESPAGE
 
 #include "btbookshelfwizardpage.h"
 
@@ -28,7 +29,7 @@ class BtBookshelfLanguagesPage final: public BtBookshelfWizardPage {
 
 public: /* Methods: */
 
-    BtBookshelfLanguagesPage(QWidget * parent = nullptr);
+    BtBookshelfLanguagesPage(QWidget * parent = 0);
 
     void initializeLanguages();
     void initializePage() final override;
@@ -37,7 +38,7 @@ public: /* Methods: */
     QStringList selectedLanguages() const;
     bool skipPage() const noexcept;
 
-private Q_SLOTS:
+private slots:
 
     void slotDataChanged();
 
@@ -53,3 +54,5 @@ private: /* Fields: */
     BtListModel * m_model;
 
 }; /* class BtBookshelfLanguagesPage */
+
+#endif

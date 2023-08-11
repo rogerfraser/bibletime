@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CBIBLEKEYCHOOSER_H
+#define CBIBLEKEYCHOOSER_H
 
 #include "../ckeychooser.h"
 
@@ -18,44 +19,59 @@
 #include "../../../backend/drivers/cswordbiblemoduleinfo.h"
 
 
+class QWidget;
+
 class BtBibleKeyWidget;
 class CSwordVerseKey;
 class CSwordBibleModuleInfo;
-class QWidget;
 
-/** \brief A key chooser for bibles and commentaries. */
-class CBibleKeyChooser final : public CKeyChooser {
+/** This class implements the KeyChooser for bibles and commentaries
+ *
+ * it inhertits @ref CKeyChooser
+ *
+ * it uses a BtBibleKeyWidget to represent the bible keys
+ *
+  * @author The BibleTime team
+  */
 
-    Q_OBJECT
+class CBibleKeyChooser : public CKeyChooser  {
+        Q_OBJECT
 
-public: /* Methods: */
+    public:
+        CBibleKeyChooser(const BtConstModuleList &modules,
+                         BTHistory *history, CSwordKey *key = nullptr,
+                         QWidget *parent = nullptr);
 
-    CBibleKeyChooser(BtConstModuleList const & modules,
-                     BTHistory * history,
-                     CSwordKey * key = nullptr,
-                     QWidget * parent = nullptr);
+    public slots:
 
-    CSwordKey * key() final override;
+        CSwordKey* key() override;
 
-    void setKey(CSwordKey * key) final override;
+        void setKey(CSwordKey *key) override;
 
-    void setModules(BtConstModuleList const & modules,
-                    bool refresh = true) final override;
+        void setModules(const BtConstModuleList &modules,
+                        bool refresh = true) override;
 
-    void refreshContent() final override;
+        /**
+        * used to do actions before key changes
+        */
+        void beforeRefChange(CSwordVerseKey *key);
+        /**
+        * used to do actions after key changes
+        */
+        void refChanged(CSwordVerseKey *key);
 
-public Q_SLOTS:
+        void updateKey(CSwordKey* key) override;
+        void adjustFont() override;
+        void refreshContent() override;
 
-    void updateKey(CSwordKey * key) final override;
+    protected slots:
 
-private: /* Methods: */
+        void setKey(const QString & newKey) override;
 
-    void handleHistoryMoved(QString const & newKey) final override;
+    private:
+        BtBibleKeyWidget* w_ref;
+        QList<const CSwordBibleModuleInfo*> m_modules;
+        CSwordVerseKey *m_key;
+};
 
-private: /* Fields: */
-
-    BtBibleKeyWidget * w_ref;
-    QList<CSwordBibleModuleInfo const *> m_modules;
-    CSwordVerseKey * m_key;
-
-}; /* class CBibleKeyChooser */
+#endif

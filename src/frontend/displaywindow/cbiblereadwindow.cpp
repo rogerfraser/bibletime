@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -28,32 +28,38 @@
 #include "../bibletimeapp.h"
 #include "../cexportmanager.h"
 #include "../cmdiarea.h"
-#include "../display/btmodelviewreaddisplay.h"
+#include "../display/creaddisplay.h"
 #include "../keychooser/ckeychooser.h"
 #include "btactioncollection.h"
 #include "btdisplaysettingsbutton.h"
 #include "ccommentaryreadwindow.h"
 
 
-void CBibleReadWindow::applyProfileSettings(BtConfigCore const & conf) {
-    CDisplayWindow::applyProfileSettings(conf);
+void CBibleReadWindow::applyProfileSettings(const QString & windowGroup) {
+    CLexiconReadWindow::applyProfileSettings(windowGroup);
 
     setObjectName("CBibleReadWindow");
-    setFilterOptions(BtConfig::loadFilterOptionsFromGroup(conf));
-    setDisplayOptions(BtConfig::loadDisplayOptionsFromGroup(conf));
+    BtConfig & conf = btConfig();
+    conf.beginGroup(windowGroup);
+    filterOptions() = conf.getFilterOptions();
+    displayOptions() = conf.getDisplayOptions();
+    conf.endGroup();
 
-    Q_EMIT sigFilterOptionsChanged(filterOptions());
-    Q_EMIT sigDisplayOptionsChanged(displayOptions());
+    emit sigFilterOptionsChanged(filterOptions());
+    emit sigDisplayOptionsChanged(displayOptions());
 
     // Apply settings to display:
     lookup();
 }
 
-void CBibleReadWindow::storeProfileSettings(BtConfigCore & conf) const {
-    BtConfig::storeFilterOptionsToGroup(filterOptions(), conf);
-    BtConfig::storeDisplayOptionsToGroup(displayOptions(), conf);
+void CBibleReadWindow::storeProfileSettings(QString const & windowGroup) const {
+    BtConfig & conf = btConfig();
+    conf.beginGroup(windowGroup);
+    conf.setFilterOptions(filterOptions());
+    conf.setDisplayOptions(displayOptions());
+    conf.endGroup();
 
-    CDisplayWindow::storeProfileSettings(conf);
+    CLexiconReadWindow::storeProfileSettings(windowGroup);
 }
 
 
@@ -126,16 +132,19 @@ void CBibleReadWindow::insertKeyboardActions( BtActionCollection* const a ) {
 void CBibleReadWindow::initActions() {
     BtActionCollection* ac = actionCollection();
 
-    CDisplayWindow::initActions(); //make sure the predefined actions are available
+    CLexiconReadWindow::initActions(); //make sure the predefined actions are available
 
     insertKeyboardActions(ac);
 
-    initAddAction("nextBook", this, &CBibleReadWindow::nextBook);
-    initAddAction("previousBook", this, &CBibleReadWindow::previousBook);
-    initAddAction("nextChapter", this, &CBibleReadWindow::nextChapter);
-    initAddAction("previousChapter", this, &CBibleReadWindow::previousChapter);
-    initAddAction("nextVerse", this, &CBibleReadWindow::nextVerse);
-    initAddAction("previousVerse", this, &CBibleReadWindow::previousVerse);
+    ac->action("nextEntry").setEnabled(false);
+    ac->action("previousEntry").setEnabled(false);
+
+    initAction("nextBook", this, &CBibleReadWindow::nextBook);
+    initAction("previousBook", this, &CBibleReadWindow::previousBook);
+    initAction("nextChapter", this, &CBibleReadWindow::nextChapter);
+    initAction("previousChapter", this, &CBibleReadWindow::previousChapter);
+    initAction("nextVerse", this, &CBibleReadWindow::nextVerse);
+    initAction("previousVerse", this, &CBibleReadWindow::previousVerse);
 
     m_actions.findText = &ac->action("findText");
     m_actions.findStrongs = &ac->action(CResMgr::displaywindows::general::findStrongs::actionName);
@@ -143,57 +152,65 @@ void CBibleReadWindow::initActions() {
 
     m_actions.pipeRefAndTextToLyX = 
             &initAction("pipeRefAndTextToLyX",
-                        displayWidget(),
-                        &BtModelViewReadDisplay::pipeAnchorWithText);
+                        displayWidget()->connectionsProxy(),
+                        &CDisplayConnections::pipeAnchorWithText);
     m_actions.pipeRefAndTextToLyX->setIcon(CResMgr::displaywindows::bibleWindow::lyxMenu::icon());
     
     m_actions.copy.referenceTextOnly =
-            &initAddAction("copyTextOfReference",
-                           displayWidget(),
-                           &BtModelViewReadDisplay::copyAnchorTextOnly);
+            &initAction("copyTextOfReference",
+                        displayWidget()->connectionsProxy(),
+                        &CDisplayConnections::copyAnchorTextOnly);
 
     m_actions.copy.referenceAndText =
-            &initAddAction("copyReferenceWithText",
-                           displayWidget(),
-                           &BtModelViewReadDisplay::copyAnchorWithText);
+            &initAction("copyReferenceWithText",
+                        displayWidget()->connectionsProxy(),
+                        &CDisplayConnections::copyAnchorWithText);
 
     m_actions.copy.chapter =
-            &initAddAction("copyChapter",
-                           this,
-                           &CBibleReadWindow::copyDisplayedText);
+            &initAction("copyChapter",
+                        this,
+                        &CBibleReadWindow::copyDisplayedText);
 
     m_actions.copy.selectedText = &ac->action("copySelectedText");
 
     m_actions.copy.byReferences = &ac->action("copyByReferences");
 
     m_actions.save.referenceAndText =
-            &initAddAction("saveReferenceWithText",
-                           displayWidget(),
-                           &BtModelViewReadDisplay::saveAnchorWithText);
+            &initAction("saveReferenceWithText",
+                        displayWidget()->connectionsProxy(),
+                        &CDisplayConnections::saveAnchorWithText);
 
     m_actions.save.chapterAsPlain =
-            &initAddAction("saveChapterAsPlainText",
-                           this,
-                           &CBibleReadWindow::saveChapterPlain);
+            &initAction("saveChapterAsPlainText",
+                        this,
+                        &CBibleReadWindow::saveChapterPlain);
 
     m_actions.save.chapterAsHTML =
-            &initAddAction("saveChapterAsHTML",
-                           this,
-                           &CBibleReadWindow::saveChapterHTML);
+            &initAction("saveChapterAsHTML",
+                        this,
+                        &CBibleReadWindow::saveChapterHTML);
 
     m_actions.print.reference =
-            &initAddAction("printReferenceWithText",
-                           this,
-                           &CBibleReadWindow::printAnchorWithText);
+            &initAction("printReferenceWithText",
+                        this,
+                        &CBibleReadWindow::printAnchorWithText);
 
     m_actions.print.chapter =
-            &initAddAction("printChapter", this, &CBibleReadWindow::printAll);
+            &initAction("printChapter", this, &CBibleReadWindow::printAll);
 
     ac->readShortcuts("Bible shortcuts");
 }
 
+void CBibleReadWindow::initConnections() {
+    CLexiconReadWindow::initConnections();
+}
+
+void CBibleReadWindow::initToolbars() {
+    CLexiconReadWindow::initToolbars();
+}
+
 void CBibleReadWindow::initView() {
-    CDisplayWindow::initView();
+    CLexiconReadWindow::initView();
 
     parentWidget()->installEventFilter(this);
 }
@@ -235,8 +252,7 @@ void CBibleReadWindow::setupPopupMenu() {
     // Save raw HTML action for debugging purposes
     if (btApp->debugMode()) {
         QAction* debugAction = new QAction("Raw HTML", this);
-        BT_CONNECT(debugAction, &QAction::triggered,
-                   this,        &CBibleReadWindow::saveRawHTML);
+        BT_CONNECT(debugAction, SIGNAL(triggered()), this, SLOT(saveRawHTML()));
         m_actions.saveMenu->addAction(debugAction);
     } // end of Save Raw HTML
     popup()->addMenu(m_actions.saveMenu);
@@ -250,7 +266,8 @@ void CBibleReadWindow::setupPopupMenu() {
 /** Reimplemented. */
 void CBibleReadWindow::updatePopupMenu() {
 
-    auto const & display = *displayWidget();
+    CReadDisplay const & display =
+            *static_cast<CReadDisplay *>(displayWidget());
     m_actions.findStrongs->setEnabled(!display.getCurrentNodeInfo().isNull());
 
     bool const hasActiveAnchor = display.hasActiveAnchor();
@@ -327,7 +344,7 @@ void CBibleReadWindow::copyDisplayedText() {
     vk.setLowerBound(dummy);
 
     const CSwordBibleModuleInfo* bible = dynamic_cast<const CSwordBibleModuleInfo*>(modules().first());
-    dummy.setVerse(bible->verseCount(dummy.bookName(), dummy.chapter()));
+    dummy.setVerse(bible->verseCount(dummy.book(), dummy.getChapter()));
     vk.setUpperBound(dummy);
 
     CExportManager mgr(false, tr("Copying"), filterOptions(), displayOptions());
@@ -339,7 +356,7 @@ void CBibleReadWindow::saveChapterHTML() {
     saveChapter(CExportManager::HTML);
 }
 
-/** Saves the chapter as valid HTML page. */
+/** Saves the chapter in plain text. */
 void CBibleReadWindow::saveChapterPlain() {
     saveChapter(CExportManager::Text);
 }
@@ -358,7 +375,7 @@ void CBibleReadWindow::saveChapter(CExportManager::Format const format) {
     vk.setLowerBound(dummy);
 
     const CSwordBibleModuleInfo* bible = dynamic_cast<const CSwordBibleModuleInfo*>(modules().first());
-    dummy.setVerse(bible->verseCount(dummy.book(), dummy.chapter()));
+    dummy.setVerse(bible->verseCount(dummy.book(), dummy.getChapter()));
     vk.setUpperBound(dummy);
 
     CExportManager mgr(true, tr("Saving"), filterOptions(), displayOptions());
@@ -366,7 +383,7 @@ void CBibleReadWindow::saveChapter(CExportManager::Format const format) {
 }
 
 void CBibleReadWindow::reload(CSwordBackend::SetupChangedReason reason) {
-    CDisplayWindow::reload(reason);
+    CLexiconReadWindow::reload(reason);
 
     if (m_modules.isEmpty()) {
         close();
@@ -382,7 +399,7 @@ void CBibleReadWindow::reload(CSwordBackend::SetupChangedReason reason) {
 
 /** No descriptions */
 bool CBibleReadWindow::eventFilter( QObject* o, QEvent* e) {
-    const bool ret = CDisplayWindow::eventFilter(o, e);
+    const bool ret = CLexiconReadWindow::eventFilter(o, e);
 
     //   BT_ASSERT(o->inherits("CDisplayWindow"));
     //   qWarning("class: %s", o->className());
@@ -396,22 +413,26 @@ bool CBibleReadWindow::eventFilter( QObject* o, QEvent* e) {
         * This is not really in a KHTML event handler but works anyway.
         * Sometime KDE/Qt is hard to use ...
         */
-        QTimer::singleShot(0, this, &CBibleReadWindow::syncWindows);
+        QTimer::singleShot(0, this, SLOT(syncWindows()));
     }
 
     return ret;
 }
 
 void CBibleReadWindow::lookupSwordKey( CSwordKey* newKey ) {
-    CDisplayWindow::lookupSwordKey(newKey);
+    CLexiconReadWindow::lookupSwordKey(newKey);
     syncWindows();
 }
 
 void CBibleReadWindow::syncWindows() {
-    for (auto * const subWindow : mdi()->subWindowList()) {
+    Q_FOREACH(QMdiSubWindow * const subWindow, mdi()->subWindowList()) {
         CDisplayWindow* w = dynamic_cast<CDisplayWindow*>(subWindow->widget());
         if (w && w->syncAllowed()) {
             w->lookupKey( key()->key() );
         }
     }
+}
+
+void CBibleReadWindow::setupMainWindowToolBars() {
+    CLexiconReadWindow::setupMainWindowToolBars();
 }

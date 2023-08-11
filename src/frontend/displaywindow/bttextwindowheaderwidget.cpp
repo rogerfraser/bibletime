@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -57,7 +57,7 @@ BtTextWindowHeaderWidget::BtTextWindowHeaderWidget(
         m_removeAction->setIcon(
                     CResMgr::displaywindows::general::icon_removeModule());
         BT_CONNECT(m_removeAction, &QAction::triggered,
-                   [this] { Q_EMIT sigModuleRemove(m_id); });
+                   [this] { emit sigModuleRemove(m_id); });
         popup->addAction(m_removeAction);
 
         // Add Replace and Add menus, both have all modules in them
@@ -72,7 +72,7 @@ BtTextWindowHeaderWidget::BtTextWindowHeaderWidget(
         BT_CONNECT(m_replaceMenu, &BtModuleChooserMenu::sigModuleChosen,
                    [this](CSwordModuleInfo * const module) {
                         BT_ASSERT(module);
-                        Q_EMIT sigModuleReplace(m_id, module->name());
+                        emit sigModuleReplace(m_id, module->name());
                     });
         popup->addMenu(m_replaceMenu);
 
@@ -86,7 +86,7 @@ BtTextWindowHeaderWidget::BtTextWindowHeaderWidget(
         BT_CONNECT(m_addMenu, &BtModuleChooserMenu::sigModuleChosen,
                    [this](CSwordModuleInfo * const module) {
                         BT_ASSERT(module);
-                        Q_EMIT sigModuleAdd(m_id + 1, module->name());
+                        emit sigModuleAdd(m_id + 1, module->name());
                     });
         popup->addMenu(m_addMenu);
     m_button->setMenu(popup);

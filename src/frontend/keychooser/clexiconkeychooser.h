@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CLEXICONKEYCHOOSER_H
+#define CLEXICONKEYCHOOSER_H
 
 #include "ckeychooser.h"
 
@@ -22,41 +23,54 @@ class CSwordModuleInfo;
 class QHBoxLayout;
 class QWidget;
 
-class CLexiconKeyChooser final : public CKeyChooser {
+/**
+ * This class implements the KeyChooser for lexicons
+ *
+ * it inhertits @ref CKeyChooser
+ * it uses 1 @ref CKeyChooserWidget to represent the lexicon keys
+ *
+  * @author The BibleTime team
+  */
+class CLexiconKeyChooser : public CKeyChooser {
+        Q_OBJECT
 
-    Q_OBJECT
+    public:
+        CLexiconKeyChooser(const BtConstModuleList &modules,
+                           BTHistory *history, CSwordKey *key = nullptr,
+                           QWidget *parent = nullptr);
 
-public: /* Methods: */
+    public slots:
 
-    CLexiconKeyChooser(BtConstModuleList const & modules,
-                       BTHistory * history,
-                       CSwordKey * key = nullptr,
-                       QWidget * parent = nullptr);
+        CSwordKey *key() override;
 
-public: /* Methods: */
+        void setKey(CSwordKey* key) override;
 
-    CSwordKey * key() final override;
+        /**
+        * used to react to changes in the @ref CKeyChooserWidget
+        *
+        * @param index not used
+        **/
+        void activated(int index);
 
-    void setKey(CSwordKey * key) final override;
+        void refreshContent() override;
 
-    void refreshContent() final override;
+        void setModules(const BtConstModuleList &modules,
+                        bool refresh = true) override;
 
-    void setModules(BtConstModuleList const & modules,
-                    bool refresh = true) final override;
+    protected:
+        CKeyChooserWidget *m_widget;
+        CSwordLDKey* m_key;
+        QList<const CSwordLexiconModuleInfo*> m_modules;
+        QHBoxLayout *m_layout;
 
-public Q_SLOTS:
+        inline void adjustFont() override {}
 
-    void updateKey(CSwordKey* key) final override;
+    public slots: // Public slots
+        void updateKey(CSwordKey* key) override;
 
-private: /* Methods: */
+    protected slots:
+        void setKey(const QString & newKey) override;
 
-    void handleHistoryMoved(QString const & newKey) final override;
+};
 
-private: /* Fields: */
-
-    CKeyChooserWidget * m_widget;
-    CSwordLDKey * m_key;
-    QList<CSwordLexiconModuleInfo const *> m_modules;
-    QHBoxLayout * m_layout;
-
-}; /* class CLexiconKeyChooser */
+#endif

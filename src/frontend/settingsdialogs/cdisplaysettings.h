@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CDISPLAYSETTINGS_H
+#define CDISPLAYSETTINGS_H
 
 #include "btconfigdialog.h"
 
@@ -30,7 +31,7 @@ class CDisplaySettingsPage: public BtConfigDialog::Page {
 
         CDisplaySettingsPage(CConfigurationDialog *parent = nullptr);
 
-        void save() const final override;
+        void save();
 
         static void resetLanguage();
 
@@ -38,7 +39,7 @@ class CDisplaySettingsPage: public BtConfigDialog::Page {
 
         void retranslateUi();
 
-    private Q_SLOTS:
+    protected slots:
         /** Update the style preview widget. */
         void updateStylePreview();
 
@@ -61,3 +62,5 @@ class CDisplaySettingsPage: public BtConfigDialog::Page {
         QLabel *m_previewLabel;
 
 };
+
+#endif

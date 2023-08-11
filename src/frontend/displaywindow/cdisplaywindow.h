@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CDISPLAYWINDOW_H
+#define CDISPLAYWINDOW_H
 
 #include <QMainWindow>
 
@@ -23,10 +24,7 @@
 #include "btactioncollection.h"
 
 
-class BtConfigCore;
-class BtToolBarPopupAction;
-class BtModelViewReadDisplay;
-class CSwordLDKey;
+class CDisplay;
 class BtDisplaySettingsButton;
 class CKeyChooser;
 class CMDIArea;
@@ -36,60 +34,75 @@ class QMenu;
 class QToolBar;
 class BTHistory;
 class BibleTime;
-class CLexiconReadWindow;
 
-/** \brief The base class for all display windows of BibleTime. */
+/** The base class for all display windows of BibleTime.
+  *
+  * Inherits QMainWindow.
+  *
+  * Inherited by CReadWindow and CWriteWindow.
+  *
+  * @author The BibleTime team
+  */
 class CDisplayWindow : public QMainWindow {
     Q_OBJECT
-    friend class CLexiconReadWindow;
 public:
-
-    virtual CSwordModuleInfo::ModuleType moduleType() const;
 
     /** Insert the keyboard accelerators of this window into the given actioncollection.*/
     static void insertKeyboardActions( BtActionCollection* const a );
 
     /** Returns pointer to the mdi area object.*/
-    CMDIArea * mdi() const { return m_mdi; }
+    inline CMDIArea *mdi() const {
+        return m_mdi;
+    }
 
     /** Returns the correct window caption.*/
-    QString windowCaption();
+    const QString windowCaption();
 
     /** Returns the used modules as a pointer list.*/
-    BtConstModuleList modules() const;
+    const BtConstModuleList modules() const;
 
     /** Returns the used modules as a string list. */
-    QStringList const & getModuleList() const { return m_modules; }
+    inline const QStringList &getModuleList() const {
+        return m_modules;
+    }
 
-    /**
-       \brief Stores the settings of this window to configuration.
-       \param[in] windowConf The locked configuration group.
-    */
-    virtual void storeProfileSettings(BtConfigCore & windowConf) const;
+    /** Store the settings of this window in the given CProfileWindow object.*/
+    virtual void storeProfileSettings(QString const & windowGroup) const;
 
-    /**
-       \brief Loads the settings of this window from configuration.
-       \param[in] windowConf The locked configuration group.
-    */
-    virtual void applyProfileSettings(BtConfigCore const & windowConf);
+    /** Load the settings the given CProfileWindow object into this window.*/
+    virtual void applyProfileSettings(const QString & windowGroup);
 
     /** Returns the display options used by this display window. */
-    DisplayOptions const & displayOptions() const { return m_displayOptions; }
+    inline const DisplayOptions &displayOptions() const {
+        return m_displayOptions;
+    }
 
     /** Returns the filter options used by this window. */
-    FilterOptions const & filterOptions() const { return m_filterOptions; }
+    inline const FilterOptions &filterOptions() const {
+        return m_filterOptions;
+    }
 
     /** Returns true if the widget is ready for use. */
-    bool isReady() const { return m_isReady; }
+    inline bool isReady() const {
+        return m_isReady;
+    }
+
+    /** Returns true if the window may be closed.*/
+    virtual bool queryClose();
 
     /** Returns history for this window */
     BTHistory* history();
 
     /** Returns the keychooser widget of this display window. */
-    CKeyChooser * keyChooser() const { return m_keyChooser; }
+    inline CKeyChooser *keyChooser() const {
+        return m_keyChooser;
+    }
+
+    /** Sets the new sword key.*/
+    void setKey( CSwordKey* key );
 
     /** Returns the key of this display window. */
-    CSwordKey * key() const {
+    inline CSwordKey *key() const {
         BT_ASSERT(m_swordKey);
         return m_swordKey;
     }
@@ -107,22 +120,31 @@ public:
     void setButtonsToolBar( QToolBar* bar );
 
     /** Returns the main navigation toolbar. */
-    QToolBar * mainToolBar() const { return m_mainToolBar; }
+    inline QToolBar *mainToolBar() const {
+        return m_mainToolBar;
+    }
 
     /** Returns the tool buttons toolbar. */
-    QToolBar * buttonsToolBar() const { return m_buttonsToolBar; }
+    inline QToolBar *buttonsToolBar() const {
+        return m_buttonsToolBar;
+    }
+
+    /** Initialize the toolbars.*/
+    virtual void initToolbars() = 0;
 
     /** Sets the display settings button.*/
     void setDisplaySettingsButton( BtDisplaySettingsButton* button );
 
+    virtual void setupPopupMenu() = 0;
+
     /** Returns the display widget used by this implementation of CDisplayWindow. */
-    BtModelViewReadDisplay * displayWidget() const {
+    virtual inline CDisplay *displayWidget() const {
         BT_ASSERT(m_displayWidget);
         return m_displayWidget;
     }
 
     /** Sets the display widget used by this display window.*/
-    void setDisplayWidget(BtModelViewReadDisplay * newDisplay);
+    virtual void setDisplayWidget( CDisplay* newDisplay );
 
     /**
         * Returns whether syncs to the active window are allowed at this time for this display window
@@ -139,22 +161,17 @@ public:
         */
     void windowActivated();
 
-    BtActionCollection * actionCollection() const { return m_actionCollection; }
+    inline BtActionCollection *actionCollection() const {
+        return m_actionCollection;
+    }
 
-    bool hasSelectedText();
+    virtual void copySelectedText() = 0;
 
-    /** Updates the status of the popup menu entries. */
-    virtual void copyDisplayedText();
+    virtual void copyByReferences() = 0;
 
-    int getSelectedColumn() const;
+    virtual bool hasSelectedText() = 0;
 
-    int getFirstSelectedIndex() const;
-
-    int getLastSelectedIndex() const;
-
-    CSwordKey* getMouseClickedKey() const;
-
-Q_SIGNALS:
+signals:
     /** The module list was set because backend was reloaded.*/
     void sigModuleListSet(QStringList modules);
     /** A module was added to this window.*/
@@ -180,17 +197,28 @@ Q_SIGNALS:
     /**  signal for sword key change */
     void sigKeyChanged(CSwordKey* key);
 
-public Q_SLOTS:
+public slots:
     /** Receives a signal telling that a module should be added.*/
     void slotAddModule(int index, QString module);
     void slotReplaceModule(int index, QString newModule);
     void slotRemoveModule(int index);
 
+    /**
+        * Lookup the specified key in the given module. If the module is not chosen withing
+        * this display window create a new displaywindow with the right module in it.
+        */
+    virtual void lookupModKey( const QString& module, const QString& key );
+
     /** Lookup the key in the chosen modules.*/
-    void lookupKey(QString const & key);
+    virtual void lookupKey( const QString& key );
 
     /** Refresh the settings of this window.*/
     virtual void reload(CSwordBackend::SetupChangedReason reason);
+
+    void slotShowNavigator(bool show);
+    void slotShowToolButtons(bool show);
+    void slotShowModuleChooser(bool show);
+    void slotShowHeader(bool show);
 
 protected:
 
@@ -199,15 +227,18 @@ protected:
     CDisplayWindow(const QList<CSwordModuleInfo *> & modules, CMDIArea * parent);
     ~CDisplayWindow() override;
 
-    void setDisplayOptions(DisplayOptions const & v) { m_displayOptions = v; }
+    /**
+          \returns the display options used by this display window.
+        */
+    inline DisplayOptions &displayOptions() {
+        return m_displayOptions;
+    }
 
-    void setFilterOptions(FilterOptions const & v) { m_filterOptions = v; }
-
-    template <typename ... Args>
-    QAction & initAddAction(Args && ... args) {
-        QAction & action = initAction(std::forward<Args>(args)...);
-        addAction(&action);
-        return action;
+    /**
+          \returns the filter options used by this window.
+        */
+    inline FilterOptions &filterOptions() {
+        return m_filterOptions;
     }
 
     /** Initializes the internel keyboard actions.*/
@@ -217,40 +248,52 @@ protected:
     void setKeyChooser( CKeyChooser* ck );
 
     /** Returns the module chooser bar. */
-    BtModuleChooserBar * moduleChooserBar() const { return m_moduleChooserBar; }
+    inline BtModuleChooserBar *moduleChooserBar() const {
+        return m_moduleChooserBar;
+    }
 
     /** Lookup the given key.*/
-    virtual void lookupSwordKey(CSwordKey *);
+    virtual void lookupSwordKey( CSwordKey* ) = 0;
 
     /** Sets the module chooser bar.*/
     void setModuleChooserBar( BtModuleChooserBar* bar );
 
-    QToolBar * headerBar() const { return m_headerBar; }
+    void setHeaderBar(QToolBar* header);
+
+    inline QToolBar *headerBar() const {
+        return m_headerBar;
+    }
+
+    /** Sets the modules. */
+    void setModules( const QList<CSwordModuleInfo*>& modules );
 
     /** Initializes the signal / slot connections of this display window.*/
-    virtual void initConnections();
+    virtual void initConnections() = 0;
 
     /** Initialize the view of this display window.*/
-    virtual void initView();
-
-    /** Initialize the toolbars.*/
-    virtual void initToolbars();
-
-    virtual void setupPopupMenu();
-
-    /** Update the status of the popup menu entries. */
-    virtual void updatePopupMenu();
+    virtual void initView() = 0;
 
     /** Returns the installed RMB popup menu.*/
     QMenu* popup();
 
     /** Called to add actions to mainWindow toolbars */
-    virtual void setupMainWindowToolBars();
+    virtual void setupMainWindowToolBars() = 0;
+
+    void closeEvent(QCloseEvent* e) override;
 
     void setToolBarsHidden();
     void clearMainWindowToolBars();
 
-protected Q_SLOTS:
+protected slots:
+    /**
+          Sets the new filter options of this window.
+        */
+    void setFilterOptions(const FilterOptions &filterOptions);
+
+    /**
+          Sets the new display options for this window.
+        */
+    void setDisplayOptions(const DisplayOptions &displayOptions);
 
     virtual void modulesChanged();
 
@@ -260,47 +303,32 @@ protected Q_SLOTS:
         */
     void lookup();
 
+    virtual void updatePopupMenu();
+
+    void slotSearchInModules();
+
     void printAll();
 
     void printAnchorWithText();
 
-    void saveRawHTML();
+    void setFocusKeyChooser();
+
+    virtual void pageDown();
+
+    virtual void pageUp();
 
 private: /* Methods: */
 
     template <typename Name, typename ... Args>
-    QAction & initAction(Name && name, Args && ... args) {
+    inline QAction & initAction(Name && name, Args && ... args) {
         QAction & a = m_actionCollection->action(std::forward<Name>(name));
         BT_CONNECT(&a, &QAction::triggered, std::forward<Args>(args)...);
         return a;
     }
 
-protected: /* Fields: */
-
-    struct ActionsStruct {
-        BtToolBarPopupAction * backInHistory;
-        BtToolBarPopupAction * forwardInHistory;
-        QAction * findText;
-        QAction * findStrongs;
-        QMenu * copyMenu;
-        struct {
-            QAction * byReferences;
-            QAction * reference;
-            QAction * entry;
-            QAction * selectedText;
-        } copy;
-        QMenu * saveMenu;
-        struct {
-            QAction * reference;
-            QAction * entryAsPlain;
-            QAction * entryAsHTML;
-        } save;
-        QMenu * printMenu;
-        struct {
-            QAction * reference;
-            QAction * entry;
-        } print;
-    } m_actions;
+    template <typename ... Args>
+    inline void initAddAction(Args && ... args)
+    { addAction(&initAction(std::forward<Args>(args)...)); }
 
 private:
     BtActionCollection* m_actionCollection;
@@ -320,6 +348,8 @@ private:
     QToolBar* m_buttonsToolBar;
     QToolBar* m_headerBar;
     QMenu* m_popupMenu;
-    BtModelViewReadDisplay * m_displayWidget = nullptr;
+    CDisplay* m_displayWidget;
     BTHistory* m_history;
 };
+
+#endif

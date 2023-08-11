@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CKEYCHOOSER_H
+#define CKEYCHOOSER_H
 
 #include <QWidget>
 
@@ -36,7 +37,7 @@ public: /* Methods: */
     /**
       \returns the history object of this keychooser.
     */
-    BTHistory * history() const { return m_history; }
+    inline BTHistory * history() const { return m_history; }
 
     /**
     * Creates a proper Instance, either
@@ -51,11 +52,19 @@ public: /* Methods: */
                                         CSwordKey * key,
                                         QWidget * parent);
 
+public slots:
+
     /**
       Sets the CKey
       \param key the key which the widget should be set to.
     */
     virtual void setKey(CSwordKey * key) = 0;
+
+    /**
+      Updates the CKey.
+      \param key the key which the widget should be set to.
+    */
+    virtual void updateKey(CSwordKey * key) = 0;
 
     /**
       \returns the current CKey.
@@ -73,16 +82,7 @@ public: /* Methods: */
     */
     virtual void refreshContent() = 0;
 
-public Q_SLOTS:
-
-    /**
-      Updates the CKey.
-      \param key the key which the widget should be set to.
-    */
-    virtual void updateKey(CSwordKey * key) = 0;
-
-
-Q_SIGNALS:
+signals:
 
     /**
     * is emitted if the @ref CKey was changed by the user
@@ -95,10 +95,19 @@ protected: /* Methods: */
                 BTHistory * history,
                 QWidget * parent = nullptr);
 
-    virtual void handleHistoryMoved(QString const & newKey) = 0;
+    /**
+      Resets the appropriate font to for the modules.
+    */
+    virtual void adjustFont() = 0;
+
+protected slots:
+
+    virtual void setKey(const QString & newKey) = 0;
 
 private: /* Fields: */
 
     BTHistory * const m_history;
 
 };
+
+#endif

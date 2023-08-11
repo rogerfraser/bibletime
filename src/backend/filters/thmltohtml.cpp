@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -19,20 +19,15 @@
 #include "../../util/btassert.h"
 #include "../config/btconfig.h"
 #include "../drivers/cswordmoduleinfo.h"
-#include "../language.h"
+#include "../managers/clanguagemgr.h"
 #include "../managers/cswordbackend.h"
 #include "../managers/referencemanager.h"
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wextra-semi"
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <swmodule.h>
 #include <utilstr.h>
 #include <utilxml.h>
 #include <versekey.h>
-#pragma GCC diagnostic pop
 
 
 namespace Filters {
@@ -88,7 +83,8 @@ char ThmlToHtml::processText(sword::SWBuf &buf, const sword::SWKey *key,
 
     tag = QRegExp("<sync[^>]+(type|value|class)=\"([^\"]+)\"[^>]+(type|value|class)=\"([^\"]+)\"[^>]+((type|value|class)=\"([^\"]+)\")*([^<]*)>");
 
-    for (auto e : list) {
+    for (QStringList::iterator it = list.begin(); it != list.end(); ++it) {
+        QString e( *it );
 
         // pass text ahead of <sync> stright through
         int pos2 = tag.indexIn(e, 0);
@@ -269,11 +265,11 @@ bool ThmlToHtml::handleToken(sword::SWBuf &buf, const char *token,
                                 btConfig().getDefaultSwordModuleByType(
                                         "standardBible"))
                         {
-                            ReferenceManager::ParseOptions options{
+                            ReferenceManager::ParseOptions options(
                                     mod->name(),
                                     // current module key:
                                     QString::fromUtf8(myUserData->key->getText()),
-                                    myModule->getLanguage()};
+                                    myModule->getLanguage());
 
                             //it's ok to split the reference, because to descriptive text is given
                             bool insertSemicolon = false;
@@ -282,13 +278,16 @@ bool ThmlToHtml::handleToken(sword::SWBuf &buf, const char *token,
                                 QString::fromUtf8(
                                     myUserData->lastTextNode.c_str()).split(";"));
                             QString oldRef; // the previous reference to use as a base for the next refs
-                            for (auto const & ref : refs) {
+                            for (QStringList::const_iterator it(refs.begin());
+                                 it != refs.end();
+                                 ++it)
+                            {
                                 if (!oldRef.isEmpty())
                                     options.refBase = oldRef; // Use the last ref as a base, e.g. Rom 1,2-3, when the next ref is only 3:3-10
 
                                 // Use the parsed result as the base for the next ref:
                                 oldRef = ReferenceManager::parseVerseReference(
-                                                ref,
+                                                (*it),
                                                 options);
 
                                 // Prepend a ref divider if we're after the first one
@@ -298,14 +297,15 @@ bool ThmlToHtml::handleToken(sword::SWBuf &buf, const char *token,
                                 buf.append("<a href=\"")
                                    .append(
                                         ReferenceManager::encodeHyperlink(
-                                            *mod,
-                                            oldRef
+                                            mod->name(),
+                                            oldRef,
+                                            ReferenceManager::typeFromModule(mod->type())
                                         ).toUtf8().constData()
                                     )
                                    .append("\" crossrefs=\"")
                                    .append(oldRef.toUtf8().constData())
                                    .append("\">")
-                                   .append(ref.toUtf8().constData())
+                                   .append(it->toUtf8().constData())
                                    .append("</a>");
                                 insertSemicolon = true;
                             }
@@ -330,17 +330,19 @@ bool ThmlToHtml::handleToken(sword::SWBuf &buf, const char *token,
                                 ReferenceManager::parseVerseReference(
                                     QString::fromUtf8(
                                             tag.getAttribute("passage")),
-                                    ReferenceManager::ParseOptions{
+                                    ReferenceManager::ParseOptions(
                                         mod->name(),
                                         QString::fromUtf8(
                                                 myUserData->key->getText()),
-                                        myModule->getLanguage()}));
+                                        myModule->getLanguage())));
                         buf.append("<span class=\"crossreference\">")
                            .append("<a href=\"")
                            .append(
                                 ReferenceManager::encodeHyperlink(
-                                    *mod,
-                                    completeRef
+                                    mod->name(),
+                                    completeRef,
+                                    ReferenceManager::typeFromModule(
+                                        mod->type())
                                 ).toUtf8().constData()
                             )
                            .append("\" crossrefs=\"")

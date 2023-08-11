@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -33,14 +33,13 @@
 #include "../../../util/directory.h"
 #include "../../BtMimeData.h"
 #include "../../display/btmodelviewreaddisplay.h"
-#include "../../display/btmodelviewreaddisplay.h"
+#include "../../display/creaddisplay.h"
 #include "../../display/modelview/btqmlinterface.h"
 #include "btquickwidget.h"
 #include "bttextfilter.h"
 
 
-BtQmlScrollView::BtQmlScrollView(QWidget * parent,
-                                 BtModelViewReadDisplay * readDisplay)
+BtQmlScrollView::BtQmlScrollView(QWidget * parent, CReadDisplay* readDisplay)
     : QWidget(parent),
       m_readDisplay(readDisplay),
       m_qmlInterface(nullptr),
@@ -64,8 +63,8 @@ BtQmlScrollView::BtQmlScrollView(QWidget * parent,
     QQuickItem* root = m_quickWidget->rootObject();
     m_qmlInterface = root->findChild<BtQmlInterface*>();
 
-    BT_CONNECT(m_quickWidget, &BtQuickWidget::referenceDropped,
-               this, &BtQmlScrollView::referenceDropped);
+    BT_CONNECT(m_quickWidget, SIGNAL(referenceDropped(const QString&)),
+               this, SIGNAL(referenceDropped(const QString&)));
     BT_CONNECT(m_qmlInterface, &BtQmlInterface::newBibleReference, this, &BtQmlScrollView::referenceDropped);
 }
 
@@ -86,12 +85,9 @@ void BtQmlScrollView::contextMenuEvent(QContextMenuEvent* event) {
 void BtQmlScrollView::initScrollBar() {
     m_scrollBar->setRange(-100,100);
     m_scrollBar->setValue(0);
-    BT_CONNECT(m_scrollBar, &QScrollBar::sliderMoved,
-               this, &BtQmlScrollView::slotSliderMoved);
-    BT_CONNECT(m_scrollBar, &QScrollBar::sliderPressed,
-               this, &BtQmlScrollView::slotSliderPressed);
-    BT_CONNECT(m_scrollBar, &QScrollBar::sliderReleased,
-               this, &BtQmlScrollView::slotSliderReleased);
+    BT_CONNECT(m_scrollBar, SIGNAL(sliderMoved(int)), this, SLOT(slotSliderMoved(int)));
+    BT_CONNECT(m_scrollBar, SIGNAL(sliderPressed()), this, SLOT(slotSliderPressed()));
+    BT_CONNECT(m_scrollBar, SIGNAL(sliderReleased()), this, SLOT(slotSliderReleased()));
 }
 
 void BtQmlScrollView::slotSliderMoved(int value) {

@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -32,6 +32,22 @@ void BtActionCollection::addAction(QString const & name,
         m_actions.insert(name, item);
     } catch (...) {
         delete item;
+        throw;
+    }
+}
+
+void BtActionCollection::addAction(QString const & name,
+                                   QObject const * const receiver,
+                                   char const * const member)
+{
+    QAction * const action = new QAction{name, this};
+    try {
+        if (receiver && member)
+            BT_CONNECT(action,   SIGNAL(triggered()),
+                       receiver, SLOT(triggered()));
+        return addAction(name, action);
+    } catch (...) {
+        delete action;
         throw;
     }
 }
@@ -68,6 +84,6 @@ void BtActionCollection::writeShortcuts(QString const & group) const {
 BtActionCollection::Item * BtActionCollection::findActionItem(
         QString const & name) const
 {
-    auto const it(m_actions.find(name));
-    return (it != m_actions.end()) ? *it : nullptr;
+    ActionMap::const_iterator const it = m_actions.find(name);
+    return (it != m_actions.constEnd()) ? *it : nullptr;
 }

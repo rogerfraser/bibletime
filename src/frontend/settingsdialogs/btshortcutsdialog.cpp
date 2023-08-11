@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -18,7 +18,6 @@
 #include <QLabel>
 #include <QRadioButton>
 #include <QVBoxLayout>
-#include <memory>
 #include "../../util/btconnect.h"
 #include "../messagedialog.h"
 
@@ -26,48 +25,46 @@
 // *************** BtShortcutsDialog ***************************************************************************
 // A dialog to allow the user to input a shortcut for a primary and alternate key
 
-BtShortcutsDialog::BtShortcutsDialog(QWidget * parent, Qt::WindowFlags f)
-    : QDialog(parent, f)
-{
+BtShortcutsDialog::BtShortcutsDialog(QWidget* parent)
+        : QDialog(parent), m_primaryLabel(nullptr), m_alternateLabel(nullptr), m_primaryButton(nullptr), m_alternateButton(nullptr) {
+    setWindowTitle(tr("Configure shortcuts"));
     setMinimumWidth(350);
 
-    auto * const vLayout = new QVBoxLayout(this);
-
-    {
-        auto gridLayout = std::make_unique<QGridLayout>();
-
-        m_primaryButton = new QRadioButton(this);
-        m_primaryButton->setChecked(true);
-        gridLayout->addWidget(m_primaryButton, 0, 0);
-
-        m_alternateButton = new QRadioButton(this);
-        gridLayout->addWidget(m_alternateButton, 1, 0);
-
-        m_primaryLabel = new QLabel(this);
-        m_primaryLabel->setMinimumWidth(100);
-        m_primaryLabel->setFrameShape(QFrame::Panel);
-        gridLayout->addWidget(m_primaryLabel, 0, 1);
-
-        m_alternateLabel = new QLabel(this);
-        m_alternateLabel->setMinimumWidth(100);
-        m_alternateLabel->setFrameShape(QFrame::Panel);
-        gridLayout->addWidget(m_alternateLabel, 1, 1);
-
-        vLayout->addLayout(gridLayout.get());
-        gridLayout.release();
-    }
-
-    auto * const buttons = new QDialogButtonBox(QDialogButtonBox::Ok
-                                                | QDialogButtonBox::Cancel,
-                                                this);
-    message::prepareDialogBox(buttons);
-    BT_CONNECT(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
-    BT_CONNECT(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
-    vLayout->addWidget(buttons);
-
+    QVBoxLayout* vLayout = new QVBoxLayout(this);
     setLayout(vLayout);
 
-    retranslateUi();
+    QGridLayout* gridLayout = new QGridLayout();
+    vLayout->addLayout(gridLayout);
+
+    QString dialogTooltip = tr("Select first or second shortcut and type the shortcut with keyboard");
+
+    m_primaryButton = new QRadioButton(tr("First shortcut"));
+    m_primaryButton->setToolTip(dialogTooltip);
+    m_primaryButton->setChecked(true);
+    gridLayout->addWidget(m_primaryButton, 0, 0);
+
+    m_alternateButton = new QRadioButton(tr("Second shortcut"));
+    m_alternateButton->setToolTip(dialogTooltip);
+    gridLayout->addWidget(m_alternateButton, 1, 0);
+
+    m_primaryLabel = new QLabel();
+    m_primaryLabel->setToolTip(dialogTooltip);
+    m_primaryLabel->setMinimumWidth(100);
+    m_primaryLabel->setFrameShape(QFrame::Panel);
+    gridLayout->addWidget(m_primaryLabel, 0, 1);
+
+    m_alternateLabel = new QLabel();
+    m_alternateLabel->setToolTip(dialogTooltip);
+    m_alternateLabel->setMinimumWidth(100);
+    m_alternateLabel->setFrameShape(QFrame::Panel);
+    gridLayout->addWidget(m_alternateLabel, 1, 1);
+
+    QDialogButtonBox* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    message::prepareDialogBox(buttons);
+    vLayout->addWidget(buttons);
+
+    BT_CONNECT(buttons, SIGNAL(accepted()), this, SLOT(accept()));
+    BT_CONNECT(buttons, SIGNAL(rejected()), this, SLOT(reject()));
 }
 
 // get new primary key from dialog
@@ -105,35 +102,19 @@ void BtShortcutsDialog::keyReleaseEvent(QKeyEvent* event) {
     if ( (event->modifiers() & Qt::ControlModifier) == Qt::ControlModifier)
         keyStr = "Ctrl+" + keyStr;
 
-    keyChangeRequest(keyStr);
+    QKeySequence completeKeys(keyStr);
+    QString completeStr = completeKeys.toString();
+
+    keyChangeRequest(completeStr);
 }
 
 // complete the keyChangeRequest
-void BtShortcutsDialog::changeSelectedShortcut(QKeySequence const & keys) {
-    if (!m_primaryButton->isChecked() || !m_alternateButton->isChecked())
-        return;
-
-    auto const keysString(keys.toString());
+void BtShortcutsDialog::changeSelectedShortcut(const QString& keys) {
     if (m_primaryButton->isChecked())
-        m_primaryLabel->setText(keysString);
+        m_primaryLabel->setText(keys);
 
     if (m_alternateButton->isChecked())
-        m_alternateLabel->setText(keysString);
+        m_alternateLabel->setText(keys);
 }
 
-void BtShortcutsDialog::retranslateUi() {
-    setWindowTitle(tr("Configure shortcuts"));
-    auto dialogTooltip = tr("Select first or second shortcut and type the "
-                            "shortcut with keyboard");
-
-    m_primaryButton->setText(tr("First shortcut"));
-    m_primaryButton->setToolTip(dialogTooltip);
-
-    m_alternateButton->setText(tr("Second shortcut"));
-    m_alternateButton->setToolTip(dialogTooltip);
-
-    m_primaryLabel->setToolTip(dialogTooltip);
-
-    m_alternateLabel->setToolTip(dialogTooltip);
-}
 

@@ -2,14 +2,13 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
-
 #include "btmessageinputdialog.h"
 
 #include <QAction>
@@ -37,11 +36,11 @@ BtMessageInputDialog::BtMessageInputDialog(QString const & title,
     QVBoxLayout * verticalLayout = new QVBoxLayout(this);
 
     if (!infoMessage.isEmpty()) {
-        auto * const infoTextView = new QTextBrowser(this);
-        infoTextView->setPlainText(infoMessage);
-        infoTextView->setReadOnly(true);
-        infoTextView->setOpenLinks(false);
-        verticalLayout->addWidget(infoTextView);
+        m_infoTextView = new QTextBrowser(this);
+        m_infoTextView->setPlainText(infoMessage);
+        m_infoTextView->setReadOnly(true);
+        m_infoTextView->setOpenLinks(false);
+        verticalLayout->addWidget(m_infoTextView);
         resize(480, 200);
     }
 

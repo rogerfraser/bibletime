@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -15,7 +15,6 @@
 #include <cmath>
 #include <cstdlib>
 #include <exception>
-#include <random>
 #include <QAction>
 #include <QApplication>
 #include <QCloseEvent>
@@ -41,33 +40,24 @@
 #include "btmessageinputdialog.h"
 #include "cmdiarea.h"
 #include "display/btfindwidget.h"
-#include "display/btmodelviewreaddisplay.h"
 #include "displaywindow/btactioncollection.h"
 #include "displaywindow/cbiblereadwindow.h"
 #include "displaywindow/cbookreadwindow.h"
 #include "displaywindow/ccommentaryreadwindow.h"
 #include "displaywindow/cdisplaywindow.h"
 #include "displaywindow/clexiconreadwindow.h"
+#include "displaywindow/creadwindow.h"
 #include "keychooser/ckeychooser.h"
 #include "messagedialog.h"
 #include "searchdialog/csearchdialog.h"
-
-
-namespace {
 
 /**
  * Auto scroll time interval in milliseconds
  * This value is divided by an integer (2, 3, 4, etc.) to get the
  * time interval that is used.
  */
-constexpr int const autoScrollTimeInterval = 200;
+static const int autoScrollTimeInterval = 200;
 
-int randInt(int min, int max) {
-    static std::mt19937 rng((std::random_device()()));
-    return std::uniform_int_distribution<int>(min, max)(rng);
-}
-
-} // anonymous namespace
 
 BibleTime *BibleTime::m_instance = nullptr;
 
@@ -97,7 +87,7 @@ BibleTime::BibleTime(QWidget *parent, Qt::WindowFlags flags)
             splash1, splash2, splash3
         };
         QString splashImage = DU::getPicsDir().canonicalPath().append("/")
-                                              .append(splashes[randInt(0, 2)]);
+                                              .append(splashes[rand() % 3]);
         QPixmap pm;
         if (!pm.load(splashImage)) {
             qWarning("Can't load startuplogo! Check your installation.");
@@ -146,8 +136,8 @@ BibleTime::~BibleTime() {
 
 namespace {
 
-CDisplayWindow * createReadInstance(QList<CSwordModuleInfo *> const modules,
-                                    CMDIArea * const parent)
+CReadWindow * createReadInstance(QList<CSwordModuleInfo *> const modules,
+                                 CMDIArea * const parent)
 {
     switch (modules.first()->type()) {
         case CSwordModuleInfo::Bible:
@@ -254,10 +244,27 @@ void BibleTime::moduleAbout(CSwordModuleInfo *module) {
 
 /** Refreshes all presenters.*/
 void BibleTime::refreshDisplayWindows() const {
-    for (auto const * const subWindow : m_mdi->subWindowList())
+    Q_FOREACH(QMdiSubWindow const * const subWindow, m_mdi->subWindowList())
         if (CDisplayWindow * const window =
                 dynamic_cast<CDisplayWindow*>(subWindow->widget()))
             window->reload(CSwordBackend::OtherChange);
+}
+
+void BibleTime::closeEvent(QCloseEvent *event) {
+    /*
+      Sequentially queries all open subwindows whether its fine to close them. If some sub-
+      window returns false, the querying is stopped and the close event is ignored. If all
+      subwindows return true, the close event is accepted.
+    */
+    Q_FOREACH (QMdiSubWindow * const subWindow, m_mdi->subWindowList()) {
+        if (CDisplayWindow * const window = dynamic_cast<CDisplayWindow*>(subWindow->widget())) {
+            if (!window->queryClose()) {
+                event->ignore();
+                return;
+            }
+        }
+    }
+    event->accept();
 }
 
 void BibleTime::processCommandline(bool ignoreSession, const QString &bibleKey) {
@@ -278,8 +285,8 @@ void BibleTime::processCommandline(bool ignoreSession, const QString &bibleKey) 
         if (bibleKey == "random") {
             CSwordVerseKey vk(nullptr);
             const int maxIndex = 31100;
-            int newIndex = randInt(0, maxIndex);
-            vk.positionToTop();
+            int newIndex = rand() % maxIndex;
+            vk.setPosition(sword::TOP);
             vk.setIndex(newIndex);
             createReadDisplayWindow(bible, vk.key());
         } else {
@@ -302,12 +309,12 @@ void BibleTime::processCommandline(bool ignoreSession, const QString &bibleKey) 
     btConfig().sync();
 
     // temporary for testing
-    Q_EMIT colorThemeChanged();
+    emit colorThemeChanged();
 }
 
 bool BibleTime::event(QEvent* event) {
     if (event->type() == QEvent::PaletteChange) {
-        Q_EMIT colorThemeChanged();
+        emit colorThemeChanged();
         // allow to continue to update other parts of Qt widgets
     }
     if (event->type() == QEvent::Close)
@@ -335,7 +342,7 @@ const CSwordModuleInfo* BibleTime::getCurrentModule() {
     return w->modules().first();
 }
 
-BtModelViewReadDisplay * BibleTime::getCurrentDisplay() {
+CDisplay* BibleTime::getCurrentDisplay() {
     QMdiSubWindow* activeSubWindow = m_mdi->activeSubWindow();
     if (!activeSubWindow)
         return nullptr;
@@ -346,7 +353,8 @@ BtModelViewReadDisplay * BibleTime::getCurrentDisplay() {
 }
 
 void BibleTime::setDisplayFocus() {
-    if (auto * display = getCurrentDisplay())
+    CDisplay* display = getCurrentDisplay();
+    if (display)
         display->setDisplayFocus();
 }
 

@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -21,15 +21,17 @@ Item::~Item() {
     qDeleteAll(m_children);
 }
 
-int Item::indexFor(Item const & newItem) {
+int Item::indexFor(Item * newItem) {
+    BT_ASSERT(newItem);
+
     if (m_children.empty())
         return 0;
 
     int i = 0;
     for (;;) {
         Item * const nextItem(m_children.at(i));
-        BT_ASSERT(nextItem->type() == newItem.type());
-        if (newItem < *nextItem)
+        BT_ASSERT(nextItem->type() == newItem->type());
+        if (*newItem < *nextItem)
             return i;
 
         i++;
@@ -48,7 +50,7 @@ QVariant Item::data(int role) const {
             if (m_children.empty())
                 return true;
 
-            for (auto const * const child : m_children)
+            Q_FOREACH(Item const * const child, m_children)
                 if (!child->data(role).toBool())
                     return false;
             return true;

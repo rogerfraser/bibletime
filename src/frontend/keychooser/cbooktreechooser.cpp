@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -49,12 +49,14 @@ CBookTreeChooser::CBookTreeChooser(const BtConstModuleList & modules,
     m_treeView->setHeaderHidden(true);
 
     //when user selects the item whe must react
-    BT_CONNECT(m_treeView, &QTreeWidget::currentItemChanged,
-               this, &CBookTreeChooser::itemActivated);
+    BT_CONNECT(m_treeView,
+               SIGNAL(currentItemChanged(QTreeWidgetItem *, QTreeWidgetItem *)),
+               SLOT(itemActivated(QTreeWidgetItem *)));
 
     setKey(key);
     adjustFont();
-    BT_CONNECT(this, &CBookTreeChooser::keyChanged, history(), &BTHistory::add);
+    BT_CONNECT(this, SIGNAL(keyChanged(CSwordKey *)),
+               history(), SLOT(add(CSwordKey *)));
 }
 
 /** Sets a new key to this keychooser. Inherited from ckeychooser. */
@@ -86,7 +88,7 @@ void CBookTreeChooser::setKey(CSwordKey* newKey, const bool emitSignal) {
     m_treeView->scrollToItem(matching_item);
 
     if (emitSignal) {
-        Q_EMIT keyChanged(m_key);
+        emit keyChanged(m_key);
     }
 }
 
@@ -97,7 +99,7 @@ void CBookTreeChooser::setModules(const BtConstModuleList &modules,
 
     //Add given modules into private list
     m_modules.clear();
-    for (auto const * const m : modules) {
+    Q_FOREACH(CSwordModuleInfo const * const m, modules) {
         const CSBMI *book = dynamic_cast<const CSBMI*>(m);
         if (book != nullptr) {
             m_modules.append(book);
@@ -106,7 +108,7 @@ void CBookTreeChooser::setModules(const BtConstModuleList &modules,
 
     //if there exists a module and a key, setup the visible tree
     if (refresh && m_modules.count() && m_key) {
-        auto const offset = m_key->offset(); //actually unnecessary, taken care of in setupTree
+        const uint offset = m_key->getOffset(); //actually unnecessary, taken care of in setupTree
         setupTree();
         m_key->setOffset( offset );
 
@@ -139,7 +141,7 @@ void CBookTreeChooser::itemActivated( QTreeWidgetItem* item ) {
     if (item) {
         m_key->setKey(item->text(1));
         //tell possible listeners about the change
-        Q_EMIT keyChanged(m_key);
+        emit keyChanged(m_key);
     }
 }
 
@@ -163,9 +165,9 @@ void CBookTreeChooser::doShow() {
 void CBookTreeChooser::setupTree() {
     m_treeView->clear();
 
-    auto const offset = m_key->offset();
+    const unsigned long offset = m_key->getOffset();
 
-    m_key->positionToRoot();
+    m_key->root();
     addKeyChildren(m_key, m_treeView->invisibleRootItem());
 
     m_key->setOffset( offset );
@@ -175,21 +177,21 @@ void CBookTreeChooser::setupTree() {
 /** Populates tree widget with items. */
 void CBookTreeChooser::addKeyChildren(CSwordTreeKey* key, QTreeWidgetItem* item) {
     if (key->hasChildren()) {
-        key->positionToFirstChild();
+        key->firstChild();
         do {
             QStringList columns;
             columns << key->getLocalNameUnicode() << key->key();
             QTreeWidgetItem *i = new QTreeWidgetItem(item, columns, QTreeWidgetItem::Type);
             i->setData(0, Qt::ToolTipRole, key->getLocalNameUnicode());
-            auto const offset = key->offset();
+            int offset = key->getOffset();
             addKeyChildren(key, i);
             key->setOffset(offset);
         }
-        while (key->positionToNextSibling());
+        while (key->nextSibling());
     }
 }
 
-void CBookTreeChooser::handleHistoryMoved(QString const & newKey) {
+void CBookTreeChooser::setKey(const QString & newKey) {
     m_key->setKey(newKey);
     setKey(m_key);
 }

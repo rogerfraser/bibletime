@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CINFODISPLAY_H
+#define CINFODISPLAY_H
 
 #include <QWidget>
 
@@ -19,6 +20,7 @@
 #include "../backend/rendering/btinforendering.h"
 
 
+class CReadDisplay;
 class QAction;
 class QSize;
 class BibleTime;
@@ -42,18 +44,27 @@ public: /* Methods: */
     QSize sizeHint() const override;
     void updateColors();
 
-public Q_SLOTS:
+public slots:
 
     void setInfo(CSwordModuleInfo * module);
+
+private slots:
+
+    void lookupInfo(const QUrl &);
+    void selectAll();
+    void slotContextMenu(const QPoint& point);
 
 private:
     void setBrowserFont(const CSwordModuleInfo* const module);
 
 private: /* Fields: */
 
+    CReadDisplay * m_htmlPart;
     BtTextBrowser * m_textBrowser;
     BibleTime * m_mainWindow;
 
 };
 
 } //end of InfoDisplay namespace
+
+#endif

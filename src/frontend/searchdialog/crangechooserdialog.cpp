@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -29,13 +29,8 @@
 #include "../messagedialog.h"
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wextra-semi"
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <versekey.h>
 #include <listkey.h>
-#pragma GCC diagnostic pop
 
 namespace Search {
 
@@ -50,8 +45,10 @@ CRangeChooserDialog::CRangeChooserDialog(const QStringList& scopeModules, QWidge
 
     // Add the existing scopes
     BtConfig::StringMap map = btConfig().getSearchScopesForCurrentLocale(scopeModules);
-    for (auto it = map.begin(); it != map.end(); ++it)
+    BtConfig::StringMap::Iterator it;
+    for (it = map.begin(); it != map.end(); ++it) {
         new RangeItem(it.key(), it.value(), m_rangeList);
+    }
     resetEditControls();
 }
 
@@ -117,85 +114,27 @@ void CRangeChooserDialog::initView() {
 }
 
 void CRangeChooserDialog::initConnections() {
-    BT_CONNECT(m_rangeList, &QListWidget::currentItemChanged,
-               [this](QListWidgetItem *, QListWidgetItem * const previous) {
-                   if (previous) {
-                       BT_ASSERT(dynamic_cast<RangeItem *>(previous));
-                       saveCurrentToRange(static_cast<RangeItem*>(previous));
-                   }
-                   resetEditControls();
-               });
-    BT_CONNECT(m_nameEdit, &QLineEdit::textEdited,
-               this,       &CRangeChooserDialog::nameEditTextChanged);
-    BT_CONNECT(m_rangeEdit, &QTextEdit::textChanged,
-               [this]{
-                   m_resultList->clear();
-                   auto const range =
-                           m_rangeEdit->toPlainText().replace(
-                               QRegExp("\\s{0,}-\\s{0,}"),
-                               "-");
-
-                   auto const & backend = CSwordBackend::instance();
-                   for (auto const & moduleName : m_scopeModules) {
-                       auto * const module =
-                               backend->findModuleByName(moduleName);
-                       if (!module)
-                           continue;
-                       auto const verses(
-                                   sword::VerseKey(module->module().getKey())
-                                        .parseVerseList(
-                                                range.toUtf8().constData(),
-                                                "Genesis 1:1",
-                                                true));
-                       if (verses.getCount() > 0) {
-                           for (int i = 0; i < verses.getCount(); i++) {
-                               auto const * const elementText =
-                                       verses.getElement(i)->getRangeText();
-                               new QListWidgetItem(
-                                           QString::fromUtf8(elementText),
-                                           m_resultList);
-                           }
-                           break;
-                       }
-                   }
-               });
+    BT_CONNECT(m_rangeList, SIGNAL(currentItemChanged(QListWidgetItem *,
+                                                      QListWidgetItem *)),
+               this,        SLOT(selectedRangeChanged(QListWidgetItem *,
+                                                      QListWidgetItem *)));
+    BT_CONNECT(m_nameEdit, SIGNAL(textEdited(QString)),
+               this,       SLOT(nameEditTextChanged(QString)));
+    BT_CONNECT(m_rangeEdit, SIGNAL(textChanged()),
+               this,        SLOT(updateResultList()));
 
     // Connect buttons:
-    BT_CONNECT(m_buttonBox, &QDialogButtonBox::accepted,
-               this,        &CRangeChooserDialog::accept);
-    BT_CONNECT(m_buttonBox, &QDialogButtonBox::rejected,
-               this,        &CRangeChooserDialog::reject);
-    BT_CONNECT(m_newRangeButton, &QPushButton::clicked,
-               [this]{
-                   m_rangeList->setCurrentItem(
-                                new RangeItem(tr("New range"),
-                                              QString(),
-                                              m_rangeList));
-                   resetEditControls();
-               });
-    BT_CONNECT(m_deleteRangeButton, &QPushButton::clicked,
-               [this]{
-                   BT_ASSERT(dynamic_cast<RangeItem *>(
-                                 m_rangeList->currentItem()));
-                   QListWidgetItem * const i = m_rangeList->currentItem();
-                   m_rangeList->removeItemWidget(i);
-                   delete i;
-
-                   resetEditControls();
-               });
+    BT_CONNECT(m_buttonBox, SIGNAL(accepted()),
+               this,        SLOT(accept()));
+    BT_CONNECT(m_buttonBox, SIGNAL(rejected()),
+               this,        SLOT(reject()));
+    BT_CONNECT(m_newRangeButton, SIGNAL(clicked()),
+               this,             SLOT(addNewRange()));
+    BT_CONNECT(m_deleteRangeButton, SIGNAL(clicked()),
+               this,                SLOT(deleteCurrentRange()));
     QPushButton * defaultsButton = m_buttonBox->button(QDialogButtonBox::RestoreDefaults);
-    BT_CONNECT(defaultsButton, &QPushButton::clicked,
-               [this]{
-                   m_rangeList->clear();
-                   btConfig().deleteSearchScopesWithCurrentLocale();
-                   auto const map(
-                           btConfig().getSearchScopesForCurrentLocale(
-                                   m_scopeModules));
-                   for (auto it = map.begin(); it != map.end(); ++it)
-                       new RangeItem(it.key(), it.value(), m_rangeList);
-                   m_rangeList->setCurrentItem(nullptr);
-                   resetEditControls();
-               });
+    BT_CONNECT(defaultsButton, SIGNAL(clicked()),
+               this,           SLOT(restoreDefaults()));
 }
 
 void CRangeChooserDialog::retranslateUi() {
@@ -234,6 +173,25 @@ void CRangeChooserDialog::saveCurrentToRange(RangeItem * i) {
     i->setRange(m_rangeEdit->toPlainText());
 }
 
+void CRangeChooserDialog::addNewRange() {
+    static const QString nullStr;
+    RangeItem * const i = new RangeItem(tr("New range"), nullStr, m_rangeList);
+    m_rangeList->setCurrentItem(i);
+    resetEditControls();
+}
+
+void CRangeChooserDialog::selectedRangeChanged(QListWidgetItem * current,
+                                               QListWidgetItem * previous)
+{
+    Q_UNUSED(current);
+    if (previous) {
+        BT_ASSERT(dynamic_cast<RangeItem *>(previous));
+        saveCurrentToRange(static_cast<RangeItem*>(previous));
+    }
+
+    resetEditControls();
+}
+
 void CRangeChooserDialog::resetEditControls() {
     const QListWidgetItem * const item = m_rangeList->currentItem();
     BT_ASSERT(!item || dynamic_cast<RangeItem const *>(item));
@@ -250,6 +208,40 @@ void CRangeChooserDialog::resetEditControls() {
         m_nameEdit->setFocus();
 
     nameEditTextChanged(item != nullptr ? rangeItem->caption() : "");
+}
+
+void CRangeChooserDialog::updateResultList() {
+    using VK = sword::VerseKey;
+
+    m_resultList->clear();
+
+    QString const range =
+            m_rangeEdit->toPlainText().replace(QRegExp("\\s{0,}-\\s{0,}"), "-");
+
+    Q_FOREACH(const QString & moduleName, m_scopeModules) {
+        auto module = CSwordBackend::instance()->findModuleByName(moduleName);
+        if (!module)
+            continue;
+        VK vk = module->module().getKey();
+        sword::ListKey verses = vk.parseVerseList(range.toUtf8().constData(),
+                                                  "Genesis 1:1", true);
+        if (verses.getCount() > 0) {
+            for (int i = 0; i < verses.getCount(); i++) {
+                new QListWidgetItem(QString::fromUtf8(verses.getElement(i)->getRangeText()),
+                                    m_resultList);
+            }
+            break;
+        }
+    }
+}
+
+void CRangeChooserDialog::deleteCurrentRange() {
+    BT_ASSERT(dynamic_cast<RangeItem *>(m_rangeList->currentItem()));
+    QListWidgetItem *i = m_rangeList->currentItem();
+    m_rangeList->removeItemWidget(i);
+    delete i;
+
+    resetEditControls();
 }
 
 void CRangeChooserDialog::accept() {
@@ -271,6 +263,19 @@ void CRangeChooserDialog::accept() {
     btConfig().setSearchScopesWithCurrentLocale(m_scopeModules, map);
 
     QDialog::accept();
+}
+
+void CRangeChooserDialog::restoreDefaults() {
+    using SMCI = BtConfig::StringMap::ConstIterator;
+
+    m_rangeList->clear();
+    btConfig().deleteSearchScopesWithCurrentLocale();
+    const BtConfig::StringMap map = btConfig().getSearchScopesForCurrentLocale(m_scopeModules);
+    for (SMCI it = map.begin(); it != map.end(); ++it) {
+        new RangeItem(it.key(), it.value(), m_rangeList);
+    };
+    m_rangeList->setCurrentItem(nullptr);
+    resetEditControls();
 }
 
 void CRangeChooserDialog::nameEditTextChanged(const QString &newText) {

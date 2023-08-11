@@ -2,19 +2,21 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CSEARCHDIALOG_H
+#define CSEARCHDIALOG_H
 
 #include <QDialog>
 
 #include <QString>
+#include "../../backend/cswordmodulesearch.h"
 #include "../../backend/managers/cswordbackend.h"
 #include "btsearchoptionsarea.h"
 
@@ -29,7 +31,7 @@ namespace Search {
 /**
   \note destroys itself on close
 */
-class CSearchDialog final: public QDialog {
+class CSearchDialog : public QDialog {
         Q_OBJECT
     public:
         static void openDialog(const BtConstModuleList modules,
@@ -38,7 +40,7 @@ class CSearchDialog final: public QDialog {
 
         static void closeDialog();
 
-    private:
+    protected:
 
         friend class CSearchAnalysisScene;
         friend class BtSearchResultArea;
@@ -57,10 +59,24 @@ class CSearchDialog final: public QDialog {
         void initView();
 
         /**
+          Starts the search with the given module list and given search text.
+        */
+        void startSearch(const BtConstModuleList modules,
+                         const QString &searchText);
+
+        /**
+          Sets the list of modules for the search.
+        */
+        void setModules(const BtConstModuleList modules) {
+            m_searchOptionsArea->setModules(modules);
+        }
+
+        /**
           Returns the list of used modules.
         */
-        BtConstModuleList modules() const
-        { return m_searchOptionsArea->modules(); }
+        inline BtConstModuleList modules() const {
+            return m_searchOptionsArea->modules();
+        }
 
         /**
         * Sets the search text which is used for the search.
@@ -77,8 +93,9 @@ class CSearchDialog final: public QDialog {
         /**
           \returns the used search scope as a list key
         */
-        sword::ListKey searchScope() const
-        { return m_searchOptionsArea->searchScope(); }
+        inline sword::ListKey searchScope() const {
+            return m_searchOptionsArea->searchScope();
+        }
 
         /**
         * Resets the parts to the default.
@@ -93,7 +110,7 @@ class CSearchDialog final: public QDialog {
         */
         void saveDialogSettings() const;
 
-    private Q_SLOTS:
+    protected slots:
         /**
           Starts the search with the set modules and the set search text.
         */
@@ -105,6 +122,8 @@ class CSearchDialog final: public QDialog {
         */
         void initConnections();
 
+        void manageIndexesButtonClicked();
+
         void closeButtonClicked();
 
     private:
@@ -113,7 +132,11 @@ class CSearchDialog final: public QDialog {
         QPushButton* m_closeButton;
         BtSearchResultArea* m_searchResultArea;
         BtSearchOptionsArea* m_searchOptionsArea;
+
+        CSwordModuleSearch m_searcher;
 };
 
 
 } //end of namespace Search
+
+#endif

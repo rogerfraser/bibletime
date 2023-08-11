@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -42,8 +42,12 @@ const QString ResultSplitterSizesKey = "GUI/SearchDialog/SearchResultsArea/resul
 namespace Search {
 
 BtSearchResultArea::BtSearchResultArea(QWidget *parent)
-    : QWidget(parent)
-{
+        : QWidget(parent) {
+    initView();
+    initConnections();
+}
+
+void BtSearchResultArea::initView() {
     QVBoxLayout *mainLayout;
     QWidget *resultListsWidget;
     QVBoxLayout *resultListsWidgetLayout;
@@ -66,16 +70,7 @@ BtSearchResultArea::BtSearchResultArea(QWidget *parent)
     m_resultListSplitter->setOrientation(Qt::Vertical);
     m_moduleListBox = new CModuleResultView(m_resultListSplitter);
     m_resultListSplitter->addWidget(m_moduleListBox);
-
     m_resultListBox = new CSearchResultView(m_resultListSplitter);
-    BT_CONNECT(m_moduleListBox, &CModuleResultView::moduleSelected,
-               m_resultListBox, &CSearchResultView::setupTree);
-    BT_CONNECT(m_moduleListBox, &CModuleResultView::strongsSelected,
-               m_resultListBox, &CSearchResultView::setupStrongsTree);
-    BT_CONNECT(m_resultListBox, &CSearchResultView::keySelected,
-               this,            &BtSearchResultArea::updatePreview);
-    BT_CONNECT(m_resultListBox, &CSearchResultView::keyDeselected,
-               this,            &BtSearchResultArea::clearPreview);
     m_resultListSplitter->addWidget(m_resultListBox);
     resultListsWidgetLayout->addWidget(m_resultListSplitter);
 
@@ -89,42 +84,47 @@ BtSearchResultArea::BtSearchResultArea(QWidget *parent)
 
     mainLayout->addWidget(m_mainSplitter);
 
-    m_contextMenu = new QMenu(this);
-        m_selectAllAction = new QAction(tr("Select all"), this);
-        m_selectAllAction->setShortcut(QKeySequence::SelectAll);
-        m_contextMenu->addAction(m_selectAllAction);
-
-        m_copyAction = new QAction(tr("Copy"));
-        m_copyAction->setShortcut(QKeySequence::Copy);
-        m_contextMenu->addAction(m_copyAction);
-
     QVBoxLayout* frameLayout = new QVBoxLayout(m_displayFrame);
     frameLayout->setContentsMargins(0, 0, 0, 0);
     m_previewDisplay = new BtTextBrowser(this);
-    m_previewDisplay->setOpenLinks(false);
     m_previewDisplay->setToolTip(tr("Text of the selected search result item"));
-    m_previewDisplay->setContextMenuPolicy(Qt::CustomContextMenu);
-    BT_CONNECT(m_selectAllAction, &QAction::triggered,
-               m_previewDisplay,  &QTextBrowser::selectAll);
-    BT_CONNECT(m_copyAction,     &QAction::triggered,
-               m_previewDisplay, &QTextBrowser::copy);
-    BT_CONNECT(m_moduleListBox,  &CModuleResultView::moduleChanged,
-               m_previewDisplay, &QTextBrowser::clear);
-    BT_CONNECT(m_previewDisplay, &QTextBrowser::customContextMenuRequested,
-               [this](QPoint const & loc) { m_contextMenu->exec(loc); });
     frameLayout->addWidget(m_previewDisplay);
+
+    m_previewDisplay->setContextMenuPolicy(Qt::CustomContextMenu);
+    BT_CONNECT(m_previewDisplay, SIGNAL(customContextMenuRequested(const QPoint&)),
+        this, SLOT(slotContextMenu(const QPoint&)));
 
     loadDialogSettings();
 }
 
-void BtSearchResultArea::setSearchResult(CSwordModuleSearch::Results results) {
+void BtSearchResultArea::slotContextMenu(const QPoint& /* point */ ) {
+
+    QAction selectAllAction(tr("Select all"));
+    selectAllAction.setShortcut(QKeySequence::SelectAll);
+    BT_CONNECT(&selectAllAction, SIGNAL(triggered()),
+               this,            SLOT(selectAll()));
+
+    QAction copyAction(tr("Copy"));
+    copyAction.setShortcut(QKeySequence(Qt::CTRL + Qt::Key_C));
+    BT_CONNECT(&copyAction,                     SIGNAL(triggered()),
+               m_previewDisplay, SLOT(copy()));
+
+    QMenu menu;
+    menu.addAction(&selectAllAction);
+    menu.addAction(&copyAction);
+    menu.exec(QCursor::pos());
+}
+
+void BtSearchResultArea::setSearchResult(
+        const CSwordModuleSearch::Results &results)
+{
     const QString searchedText = CSearchDialog::getSearchDialog()->searchText();
     reset(); //clear current modules
 
-    m_results = std::move(results);
+    m_results = results;
 
     // Populate listbox:
-    m_moduleListBox->setupTree(m_results, searchedText);
+    m_moduleListBox->setupTree(results, searchedText);
 
     // Pre-select the first module in the list:
     m_moduleListBox->setCurrentItem(m_moduleListBox->topLevelItem(0), 0);
@@ -174,22 +174,23 @@ void BtSearchResultArea::updatePreview(const QString& key) {
             vk.previous(CSwordVerseKey::UseVerse);
 
             //include Headings in display, they are indexed and searched too
-            if (vk.verse() == 1) {
-                if (vk.chapter() == 1) {
+            if (vk.getVerse() == 1) {
+                if (vk.getChapter() == 1) {
                     vk.setChapter(0);
                 }
                 vk.setVerse(0);
             }
 
-            auto const startKey = vk;
+            const QString startKey = vk.key();
 
             vk.setKey(key);
 
             vk.next(CSwordVerseKey::UseVerse);
             vk.next(CSwordVerseKey::UseVerse);
+            const QString endKey = vk.key();
 
             settings.keyRenderingFace = CTextRendering::KeyTreeItem::Settings::CompleteShort;
-            text = render.renderKeyRange(startKey, vk, modules, key, settings);
+            text = render.renderKeyRange(startKey, endKey, modules, key, settings);
         }
         //for commentaries only one verse, but with heading
         else if (module->type() == CSwordModuleInfo::Commentary) {
@@ -202,18 +203,19 @@ void BtSearchResultArea::updatePreview(const QString& key) {
                     ->setIntros(true);
 
             //include Headings in display, they are indexed and searched too
-            if (vk.verse() == 1) {
-                if (vk.chapter() == 1) {
+            if (vk.getVerse() == 1) {
+                if (vk.getChapter() == 1) {
                     vk.setChapter(0);
                 }
                 vk.setVerse(0);
             }
-            auto const startKey = vk;
+            const QString startKey = vk.key();
 
             vk.setKey(key);
+            const QString endKey = vk.key();
 
             settings.keyRenderingFace = CTextRendering::KeyTreeItem::Settings::NoKey;
-            text = render.renderKeyRange(startKey, vk, modules, key, settings);
+            text = render.renderKeyRange(startKey, endKey, modules, key, settings);
         }
         else {
             text = render.renderSingleKey(key, modules, settings);
@@ -232,11 +234,32 @@ void BtSearchResultArea::updatePreview(const QString& key) {
 
 void BtSearchResultArea::setBrowserFont(const CSwordModuleInfo* const module) {
     if (module) {
-            auto const lang = module->language();
+            const CLanguageMgr::Language* lang = module->language();
             m_previewDisplay->setFont(btConfig().getFontForLanguage(*lang).second);
     } else {
         m_previewDisplay->setFont(btConfig().getDefaultFont());
     }
+}
+
+/** Initializes the signal slot conections of the child widgets, */
+void BtSearchResultArea::initConnections() {
+    BT_CONNECT(m_resultListBox, SIGNAL(keySelected(QString const &)),
+               this,            SLOT(updatePreview(QString const &)));
+    BT_CONNECT(m_resultListBox, SIGNAL(keyDeselected()), this, SLOT(clearPreview()));
+    BT_CONNECT(m_moduleListBox,
+               SIGNAL(moduleSelected(CSwordModuleInfo const *,
+                                     sword::ListKey const &)),
+               m_resultListBox,
+               SLOT(setupTree(CSwordModuleInfo const *,
+                              sword::ListKey const &)));
+    BT_CONNECT(m_moduleListBox,                      SIGNAL(moduleChanged()),
+               m_previewDisplay, SLOT(clear()));
+
+    // connect the strongs list
+    BT_CONNECT(m_moduleListBox,
+               SIGNAL(strongsSelected(CSwordModuleInfo *, QStringList const &)),
+               m_resultListBox,
+               SLOT(setupStrongsTree(CSwordModuleInfo *, QStringList const &)));
 }
 
 /**
@@ -271,14 +294,13 @@ void BtSearchResultArea::saveDialogSettings() const {
 * StrongsResultList:
 ******************************************************************************/
 
-StrongsResultList::StrongsResultList(
-        CSwordModuleInfo const * module,
-        CSwordModuleSearch::ModuleResultList const & result,
-        QString const & strongsNumber)
+StrongsResultList::StrongsResultList(const CSwordModuleInfo *module,
+                                     const sword::ListKey & result,
+                                     const QString &strongsNumber)
 {
     using namespace Rendering;
 
-    auto const count = result.size();
+    int count = result.getCount();
     if (!count)
         return;
 
@@ -299,21 +321,20 @@ StrongsResultList::StrongsResultList(
 
     qApp->processEvents(QEventLoop::AllEvents, 1); //1 ms only
 
-    int index = 0;
-    for (auto const & keyPtr : result) {
-        progress.setValue(index++);
+    for (int index = 0; index < count; index++) {
+        progress.setValue(index);
         qApp->processEvents(QEventLoop::AllEvents, 1); //1 ms only
 
-        QString key = QString::fromUtf8(keyPtr->getText());
+        QString key = QString::fromUtf8(result.getElement(index)->getText());
         QString text = CDisplayRendering().renderSingleKey(key, modules, settings);
         for (int sIndex = 0;;) {
             continueloop:
             QString rText = getStrongsNumberText(text, sIndex, strongsNumber);
             if (rText.isEmpty()) break;
 
-            for (auto & result : *this) {
-                if (result.keyText() == rText) {
-                    result.addKeyName(key);
+            for (iterator it = begin(); it != end(); ++it) {
+                if ((*it).keyText() == rText) {
+                    (*it).addKeyName(key);
                     goto continueloop; // break, then continue
                 }
             }

@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -22,14 +22,6 @@
 #include "../managers/referencemanager.h"
 #include "cdisplayrendering.h"
 #include "ctextrendering.h"
-
-// Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wextra-semi"
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
-#include <swmodule.h>
-#pragma GCC diagnostic pop
 
 
 using namespace Rendering;
@@ -76,19 +68,21 @@ const QString CEntryDisplay::textKeyRendering(
             false,
             CTextRendering::KeyTreeItem::Settings::NoKey};
 
-        if (k1.verse() == 1) { // X:1, prepend X:0
-            if (k1.chapter() == 1) { // 1:1, also prepend 0:0 before that
+        if (k1.getVerse() == 1) { // X:1, prepend X:0
+            if (k1.getChapter() == 1) { // 1:1, also prepend 0:0 before that
                 k1.setChapter(0);
                 k1.setVerse(0);
-                if (k1.rawText().length() > 0)
-                    tree.emplace_back(k1.key(), modules, preverse_settings);
+                if ( k1.rawText().length() > 0 ) {
+                    tree.append( new Rendering::CTextRendering::KeyTreeItem(k1.key(), modules, preverse_settings) );
+                }
                 k1.setChapter(1);
             }
             k1.setVerse(0);
-            if (k1.rawText().length() > 0)
-                tree.emplace_back(k1.key(), modules, preverse_settings);
+            if ( k1.rawText().length() > 0 ) {
+                tree.append( new Rendering::CTextRendering::KeyTreeItem(k1.key(), modules, preverse_settings) );
+            }
         }
     }
-    tree.emplace_back(keyName, modules, normal_settings);
+    tree.append( new Rendering::CTextRendering::KeyTreeItem(keyName, modules, normal_settings) );
     return render.renderKeyTree(tree);
 }

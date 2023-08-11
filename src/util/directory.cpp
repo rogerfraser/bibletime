@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -281,16 +281,20 @@ void removeRecursive(const QString &dir) {
 
     //remove all files in this dir
     d.setFilter( QDir::Files | QDir::Hidden | QDir::NoSymLinks );
-    for (auto const & fileInfo : d.entryInfoList())
-        d.remove(fileInfo.fileName());
+    const QFileInfoList fileList = d.entryInfoList();
+    for (QFileInfoList::const_iterator it_file = fileList.begin(); it_file != fileList.end(); ++it_file) {
+        d.remove( it_file->fileName() );
+    }
 
     //remove all subdirs recursively
     d.setFilter( QDir::Dirs | QDir::NoSymLinks );
-    for (auto const & dirInfo : d.entryInfoList())
-        if (dirInfo.isDir()
-            && dirInfo.fileName() != "."
-            && dirInfo.fileName() != "..")
-            removeRecursive(dirInfo.absoluteFilePath());
+    const QFileInfoList dirList = d.entryInfoList();
+    for (QFileInfoList::const_iterator it_dir = dirList.begin(); it_dir != dirList.end(); ++it_dir) {
+        if ( !it_dir->isDir() || it_dir->fileName() == "." || it_dir->fileName() == ".." ) {
+            continue;
+        }
+        removeRecursive( it_dir->absoluteFilePath() );
+    }
     d.rmdir(dir);
 }
 
@@ -306,18 +310,21 @@ size_t getDirSizeRecursive(QString const & dir) {
 
     //First get the size of all files int this folder
     d.setFilter(QDir::Files);
-    for (auto const & fileInfo : d.entryInfoList()) {
-        BT_ASSERT(fileInfo.size() > 0);
-        size += fileInfo.size();
+    const QFileInfoList infoList = d.entryInfoList();
+    for (QFileInfoList::const_iterator it = infoList.begin(); it != infoList.end(); ++it) {
+        BT_ASSERT(it->size() > 0);
+        size += it->size();
     }
 
     //Then add the sizes of all subdirectories
     d.setFilter(QDir::Dirs);
-    for (auto const & dirInfo : d.entryInfoList())
-        if (dirInfo.isDir()
-            && dirInfo.fileName() != "."
-            && dirInfo.fileName() != "..")
-            size += getDirSizeRecursive(dirInfo.absoluteFilePath());
+    const QFileInfoList dirInfoList = d.entryInfoList();
+    for (QFileInfoList::const_iterator it_dir = dirInfoList.begin(); it_dir != dirInfoList.end(); ++it_dir) {
+        if ( !it_dir->isDir() || it_dir->fileName() == "." || it_dir->fileName() == ".." ) {
+            continue;
+        }
+        size += getDirSizeRecursive( it_dir->absoluteFilePath() );
+    }
     return size;
 }
 

@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -18,7 +18,6 @@
 #include <QFocusEvent>
 #include <QHBoxLayout>
 #include <QLineEdit>
-#include <QMenu>
 #include <QMouseEvent>
 #include <QPixmap>
 #include <QString>
@@ -50,37 +49,12 @@ class BtLineEdit : public QLineEdit {
 };
 
 
-BtBibleKeyWidget::BtBibleKeyWidget(
-        CSwordBibleModuleInfo const * mod,
-        CSwordVerseKey * key,
-        QWidget * parent)
+BtBibleKeyWidget::BtBibleKeyWidget(const CSwordBibleModuleInfo *mod,
+                                   CSwordVerseKey *key, QWidget *parent,
+                                   const char *name)
    : QWidget(parent), m_key(key), m_dropDownHoverTimer(this)
 {
-    auto const slotStep =
-            [this](int offset, CSwordVerseKey::JumpType const jumpType) {
-                if (!offset)
-                    return;
-                if (offset > 0) {
-                    do {
-                        m_key->next(jumpType);
-                    } while (--offset);
-                } else {
-                    do {
-                        m_key->previous(jumpType);
-                    } while (++offset);
-                }
-                if (!updatelock)
-                    Q_EMIT changed(m_key);
-            };
-    auto const slotStepBook =
-            [slotStep](int offset)
-            { slotStep(offset, CSwordVerseKey::UseBook); };
-    auto const slotStepChapter =
-            [slotStep](int offset)
-            { slotStep(offset, CSwordVerseKey::UseChapter); };
-    auto const slotStepVerse =
-            [slotStep](int offset)
-            { slotStep(offset, CSwordVerseKey::UseVerse); };
+    Q_UNUSED(name)
 
     updatelock = false;
     m_module = mod;
@@ -91,29 +65,25 @@ BtBibleKeyWidget::BtBibleKeyWidget(
     clearRef->setIcon(CResMgr::icon_clearEdit());
     clearRef->setAutoRaise(true);
     clearRef->setStyleSheet("QToolButton{margin:0px;}");
-    BT_CONNECT(clearRef, &QToolButton::clicked,
-               [this]{
-                   m_textbox->setText("");
-                   m_textbox->setFocus();
-               });
+    BT_CONNECT(clearRef, SIGNAL(clicked()), SLOT(slotClearRef()) );
 
-    auto * const bookScroller = new CScrollerWidgetSet(this);
+    m_bookScroller = new CScrollerWidgetSet(this);
 
     m_textbox = new BtLineEdit( this );
     setFocusProxy(m_textbox);
     m_textbox->setContentsMargins(0, 0, 0, 0);
 
-    auto * const chapterScroller = new CScrollerWidgetSet(this);
-    auto * const verseScroller = new CScrollerWidgetSet(this);
+    m_chapterScroller = new CScrollerWidgetSet(this);
+    m_verseScroller = new CScrollerWidgetSet(this);
 
     QHBoxLayout* m_mainLayout = new QHBoxLayout( this );
     m_mainLayout->setContentsMargins(0, 0, 0, 0);
     m_mainLayout->setSpacing(0);
     m_mainLayout->addWidget(clearRef);
-    m_mainLayout->addWidget(bookScroller);
+    m_mainLayout->addWidget(m_bookScroller);
     m_mainLayout->addWidget(m_textbox);
-    m_mainLayout->addWidget(chapterScroller);
-    m_mainLayout->addWidget(verseScroller);
+    m_mainLayout->addWidget(m_chapterScroller);
+    m_mainLayout->addWidget(m_verseScroller);
 
 
     setTabOrder(m_textbox, nullptr);
@@ -125,60 +95,12 @@ BtBibleKeyWidget::BtBibleKeyWidget(
     m_dropDownButtons->setAttribute(Qt::WA_WindowPropagation);
     m_dropDownButtons->setCursor(Qt::ArrowCursor);
     QHBoxLayout *dropDownButtonsLayout(new QHBoxLayout(m_dropDownButtons));
-
-    auto * const bookChooser =
-            new BtDropdownChooserButton(&BtBibleKeyWidget::populateBookMenu,
-                                        *this);
-    bookChooser->setToolTip(tr("Select book"));
-    BT_CONNECT(bookChooser->menu(), &QMenu::triggered,
-               [this](QAction * const action) {
-                    auto bookname = action->property("bookname").toString();
-                    if (m_key->bookName() != bookname) {
-                        m_key->setBookName(std::move(bookname));
-                        updateText();
-                    }
-                    if (!updatelock)
-                        Q_EMIT changed(m_key);
-               });
-    BT_CONNECT(bookChooser, &BtDropdownChooserButton::stepItem, slotStepBook);
-    dropDownButtonsLayout->addWidget(bookChooser, 2);
-
-    auto * const chapterChooser =
-            new BtDropdownChooserButton(&BtBibleKeyWidget::populateChapterMenu,
-                                        *this);
-    chapterChooser->setToolTip(tr("Select chapter"));
-    BT_CONNECT(chapterChooser->menu(), &QMenu::triggered,
-               [this](QAction * const action) {
-                   int const n = action->property("chapter").toInt();
-                   if (m_key->chapter() != n) {
-                       m_key->setChapter(n);
-                       updateText();
-                   }
-                   if (!updatelock)
-                       Q_EMIT changed(m_key);
-               });
-    BT_CONNECT(chapterChooser,
-               &BtDropdownChooserButton::stepItem,
-               slotStepChapter);
-    dropDownButtonsLayout->addWidget(chapterChooser, 1);
-
-    auto * const verseChooser =
-            new BtDropdownChooserButton(&BtBibleKeyWidget::populateVerseMenu,
-                                        *this);
-    verseChooser->setToolTip(tr("Select verse"));
-    BT_CONNECT(verseChooser->menu(), &QMenu::triggered,
-               [this](QAction * const action) {
-                   int const n = action->property("verse").toInt();
-                   if (m_key->verse() != n) {
-                       m_key->setVerse(n);
-                       updateText();
-                   }
-                   if (!updatelock)
-                       Q_EMIT changed(m_key);
-               });
-    BT_CONNECT(verseChooser, &BtDropdownChooserButton::stepItem, slotStepVerse);
-    dropDownButtonsLayout->addWidget(verseChooser, 1);
-
+    m_bookDropdownButton = new BtBookDropdownChooserButton(this);
+    dropDownButtonsLayout->addWidget(m_bookDropdownButton, 2);
+    m_chapterDropdownButton = new BtChapterDropdownChooserButton(this);
+    dropDownButtonsLayout->addWidget(m_chapterDropdownButton, 1);
+    m_verseDropdownButton = new BtVerseDropdownChooserButton(this);
+    dropDownButtonsLayout->addWidget(m_verseDropdownButton, 1);
     dropDownButtonsLayout->setContentsMargins(0, 0, 0, 0);
     dropDownButtonsLayout->setSpacing(0);
     m_dropDownButtons->setLayout(dropDownButtonsLayout);
@@ -188,57 +110,48 @@ BtBibleKeyWidget::BtBibleKeyWidget(
 
     m_dropDownHoverTimer.setInterval(500);
     m_dropDownHoverTimer.setSingleShot(true);
-    BT_CONNECT(&m_dropDownHoverTimer, &QTimer::timeout,
-               m_dropDownButtons, &QWidget::hide);
+    BT_CONNECT(&m_dropDownHoverTimer, SIGNAL(timeout()),
+               m_dropDownButtons, SLOT(hide()));
 
     QString scrollButtonToolTip(tr("Scroll through the entries of the list. Press the button and move the mouse to increase or decrease the item."));
-    bookScroller->setToolTips(
+    m_bookScroller->setToolTips(
         tr("Next book"),
         scrollButtonToolTip,
         tr("Previous book")
     );
-    chapterScroller->setToolTips(
+    m_chapterScroller->setToolTips(
         tr("Next chapter"),
         scrollButtonToolTip,
         tr("Previous chapter")
     );
-    verseScroller->setToolTips(
+    m_verseScroller->setToolTips(
         tr("Next verse"),
         scrollButtonToolTip,
         tr("Previous verse")
     );
 
     // signals and slots connections
-    auto const initScrollerConnections =
-            [this](CScrollerWidgetSet & scroller, auto stepFunction)
-            {
-                BT_CONNECT(&scroller,
-                           &CScrollerWidgetSet::change,
-                           stepFunction);
-                BT_CONNECT(&scroller, &CScrollerWidgetSet::scroller_pressed,
-                           [this]{
-                               updatelock = true;
-                               oldKey = m_key->key();
-                           });
-                BT_CONNECT(&scroller, &CScrollerWidgetSet::scroller_released,
-                           [this]{
-                               updatelock = false;
-                               if (oldKey != m_key->key())
-                                   Q_EMIT changed(m_key);
-                           });
-            };
-    initScrollerConnections(*bookScroller, slotStepBook);
-    initScrollerConnections(*chapterScroller, slotStepChapter);
-    initScrollerConnections(*verseScroller, slotStepVerse);
 
-    BT_CONNECT(m_textbox, &QLineEdit::returnPressed,
-               [this]{
-                   m_key->setKey(m_textbox->text());
-                   Q_EMIT changed(m_key);
-               });
-
-    BT_CONNECT(m_key->afterChangedSignaller(), &BtSignal::signal,
-               this,                           &BtBibleKeyWidget::updateText);
+    BT_CONNECT(m_bookScroller, SIGNAL(change(int)), SLOT(slotStepBook(int)));
+    BT_CONNECT(m_bookScroller, SIGNAL(scroller_pressed()),
+               SLOT(slotUpdateLock()));
+    BT_CONNECT(m_bookScroller, SIGNAL(scroller_released()),
+               SLOT(slotUpdateUnlock()));
+    BT_CONNECT(m_textbox, SIGNAL(returnPressed()),
+               SLOT(slotReturnPressed()));
+    BT_CONNECT(m_chapterScroller, SIGNAL(change(int)),
+               SLOT(slotStepChapter(int)));
+    BT_CONNECT(m_chapterScroller, SIGNAL(scroller_pressed()),
+               SLOT(slotUpdateLock()));
+    BT_CONNECT(m_chapterScroller, SIGNAL(scroller_released()),
+               SLOT(slotUpdateUnlock()));
+    BT_CONNECT(m_verseScroller, SIGNAL(change(int)), SLOT(slotStepVerse(int)));
+    BT_CONNECT(m_verseScroller, SIGNAL(scroller_pressed()),
+               SLOT(slotUpdateLock()));
+    BT_CONNECT(m_verseScroller, SIGNAL(scroller_released()),
+               SLOT(slotUpdateUnlock()));
+    BT_CONNECT(m_key->afterChangedSignaller(), SIGNAL(signal()),
+               this,                           SLOT(updateText()));
 
     setKey(key);    // The order of these two functions is important.
     setModule();
@@ -298,6 +211,11 @@ void BtBibleKeyWidget::resetDropDownButtons() {
                                    m_textbox->width(), h);
 }
 
+void BtBibleKeyWidget::slotClearRef( ) {
+    m_textbox->setText("");
+    m_textbox->setFocus();
+}
+
 void BtBibleKeyWidget::updateText() {
     QString text(m_key->key());
     m_textbox->setText(text);
@@ -320,19 +238,98 @@ bool BtBibleKeyWidget::setKey(CSwordVerseKey *key) {
     return true;
 }
 
-void BtBibleKeyWidget::populateBookMenu(QMenu & menu) {
-    for (auto const & bookname : m_module->books())
-        menu.addAction(bookname)->setProperty("bookname", bookname);
+void BtBibleKeyWidget::slotReturnPressed() {
+    m_key->setKey(m_textbox->text());
+    emit changed(m_key);
 }
 
-void BtBibleKeyWidget::populateChapterMenu(QMenu & menu) {
-    int count = m_module->chapterCount(m_key->book());
-    for (int i = 1; i <= count; i++)
-        menu.addAction(QString::number(i))->setProperty("chapter", i);
+/* Handlers for the various scroller widgetsets. Do we really want a verse scroller? */
+void BtBibleKeyWidget::slotUpdateLock() {
+    updatelock = true;
+    oldKey = m_key->key();
 }
 
-void BtBibleKeyWidget::populateVerseMenu(QMenu & menu) {
-    int count = m_module->verseCount(m_key->bookName(), m_key->chapter());
-    for (int i = 1; i <= count; i++)
-        menu.addAction(QString::number(i))->setProperty("verse", i);
+void BtBibleKeyWidget::slotUpdateUnlock() {
+    updatelock = false;
+    if (oldKey != m_key->key())
+        emit changed(m_key);
 }
+
+void BtBibleKeyWidget::slotStepBook(int offset) {
+    emit beforeChange(m_key);
+
+    if(offset >= 0)
+        for(; offset != 0; offset--)
+            m_key->next( CSwordVerseKey::UseBook );
+    else
+        for(; offset != 0; offset++)
+            m_key->previous( CSwordVerseKey::UseBook );
+
+    if (!updatelock)
+        emit changed(m_key);
+}
+
+void BtBibleKeyWidget::slotStepChapter(int offset) {
+    emit beforeChange(m_key);
+
+    if(offset >= 0)
+        for(; offset != 0; offset--)
+            m_key->next( CSwordVerseKey::UseChapter );
+    else
+        for(; offset != 0; offset++)
+            m_key->previous( CSwordVerseKey::UseChapter );
+
+    if (!updatelock)
+        emit changed(m_key);
+}
+
+void BtBibleKeyWidget::slotStepVerse(int offset) {
+    emit beforeChange(m_key);
+
+    if(offset >= 0)
+        for(; offset != 0; offset--)
+            m_key->next( CSwordVerseKey::UseVerse );
+    else
+        for(; offset != 0; offset++)
+            m_key->previous( CSwordVerseKey::UseVerse );
+
+    if (!updatelock)
+        emit changed(m_key);
+}
+
+
+void BtBibleKeyWidget::slotChangeVerse(int n) {
+    if (m_key->getVerse() != n) {
+        emit beforeChange(m_key);
+        m_key->emitBeforeChanged();
+        m_key->setVerse(n);
+        m_key->emitAfterChanged();
+        setKey( m_key );
+    }
+    if (!updatelock) emit changed(m_key);
+}
+
+void BtBibleKeyWidget::slotChangeChapter(int n) {
+    if (m_key->getChapter() != n) {
+        emit beforeChange(m_key);
+        m_key->emitBeforeChanged();
+        m_key->setChapter(n);
+        m_key->emitAfterChanged();
+        setKey( m_key );
+    }
+    if (!updatelock)
+        emit changed(m_key);
+}
+
+void BtBibleKeyWidget::slotChangeBook(QString bookname) {
+    if (m_key->book() != bookname) {
+        emit beforeChange(m_key);
+        m_key->emitBeforeChanged();
+        m_key->book( bookname );
+        m_key->emitAfterChanged();
+        setKey( m_key );
+    }
+    if (!updatelock)
+        emit changed(m_key);
+}
+

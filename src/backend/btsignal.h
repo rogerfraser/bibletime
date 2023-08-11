@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTSIGNAL_H
+#define BTSIGNAL_H
 
 #include <QObject>
 
@@ -36,10 +37,11 @@ public:
     /**
       Immediately emits the beforeChanged() signal.
     */
-    void emitSignal() { Q_EMIT signal(); }
+    inline void emitSignal() { emit signal(); }
 
-Q_SIGNALS:
+signals:
 
     void signal();
 
 };
+#endif

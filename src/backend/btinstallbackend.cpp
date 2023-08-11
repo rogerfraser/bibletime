@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -22,14 +22,9 @@
 #include "btinstallmgr.h"
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <filemgr.h>
-#include <installmgr.h>
 #include <swconfig.h>
 #include <swbuf.h>
-#pragma GCC diagnostic pop
 
 
 using namespace sword;
@@ -66,7 +61,7 @@ bool addSource(sword::InstallSource& source) {
 /** Returns the Source struct. */
 sword::InstallSource source(const QString &name) {
     BtInstallMgr mgr;
-    auto const source = mgr.sources.find(name.toLatin1().data());
+    InstallSourceMap::iterator source = mgr.sources.find(name.toLatin1().data());
     if (source != mgr.sources.end()) {
         return *(source->second);
     }
@@ -107,7 +102,7 @@ bool deleteSource(const QString &name) {
     //this code can probably be shortened by using the stl remove_if functionality
     SWBuf sourceConfigEntry = is.getConfEnt();
     bool notFound = true;
-    auto it(config["Sources"].begin());
+    ConfigEntMap::iterator it = config["Sources"].begin();
     while (it != config["Sources"].end()) {
         //SWORD lib gave us a "nice" surprise: getConfEnt() adds uid, so old sources added by BT are not recognized here
         if (it->second == sourceConfigEntry) {
@@ -136,6 +131,14 @@ bool deleteSource(const QString &name) {
 
     config.save();
     return true; /// \todo dummy
+}
+
+/** Returns the moduleinfo list for the source. Delete the pointer after using. IS THIS POSSIBLE?*/
+QList<CSwordModuleInfo*> moduleList(QString name) {
+    /// \todo dummy
+    Q_UNUSED(name)
+    BT_ASSERT(false && "not implemented");
+    return QList<CSwordModuleInfo*>();
 }
 
 bool isRemote(const sword::InstallSource& source) {
@@ -192,8 +195,8 @@ bool setTargetList( const QStringList& targets ) {
 #endif
 
     bool setDataPath = false;
-    for (auto const & target : targets) {
-        QString t = DU::convertDirSeparators(target);
+    for (QStringList::const_iterator it = targets.begin(); it != targets.end(); ++it) {
+        QString t = DU::convertDirSeparators(*it);
 #ifdef Q_OS_WIN
         if (t.contains(DU::convertDirSeparators(DU::getUserHomeDir().canonicalPath().append("\\Sword")))) {
 #else
@@ -221,8 +224,9 @@ QStringList sourceNameList() {
     QStringList names;
 
     //add Sword remote sources
-    for (auto const & sourcePair : mgr.sources)
-        names << QString::fromLocal8Bit(sourcePair.second->caption);
+    for (InstallSourceMap::iterator it = mgr.sources.begin(); it != mgr.sources.end(); ++it) {
+        names << QString::fromLocal8Bit(it->second->caption);
+    }
 
     // Add local directory sources
     SWConfig config(configFilename().toLatin1());
@@ -272,12 +276,12 @@ QDir swordDir() {
 #endif
 }
 
-std::unique_ptr<CSwordBackend> backend(sword::InstallSource const & is) {
+CSwordBackend * backend(const sword::InstallSource & is) {
     /// \anchor BackendNotSingleton
-    auto ret(std::make_unique<CSwordBackend>(isRemote(is)
-                                             ? is.localShadow.c_str()
-                                             : is.directory.c_str(),
-                                             false));
+    CSwordBackend * const ret = new CSwordBackend(isRemote(is)
+                                                  ? is.localShadow.c_str()
+                                                  : is.directory.c_str(),
+                                                  false);
     ret->initModules(CSwordBackend::OtherChange);
     return ret;
 }

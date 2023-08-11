@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -62,10 +62,8 @@ BtEditBookmarkDialog::BtEditBookmarkDialog(const QString &key,
     message::prepareDialogBox(m_buttonBox);
     mainLayout->addWidget(m_buttonBox);
 
-    BT_CONNECT(m_buttonBox, &QDialogButtonBox::accepted,
-               this, &BtEditBookmarkDialog::accept);
-    BT_CONNECT(m_buttonBox, &QDialogButtonBox::rejected,
-               this, &BtEditBookmarkDialog::reject);
+    BT_CONNECT(m_buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
+    BT_CONNECT(m_buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
 
     retranslateUi();
 

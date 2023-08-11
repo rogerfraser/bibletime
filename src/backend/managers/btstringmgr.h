@@ -2,22 +2,18 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTSTRINGMGR_H
+#define BTSTRINGMGR_H
 
-// Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wextra-semi"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <stringmgr.h>
-#pragma GCC diagnostic pop
 
 
 /**
@@ -45,3 +41,5 @@ class BtStringMgr : public sword::StringMgr {
         bool supportsUnicode() const override;
 
 };
+
+#endif /* BTSTRINGMGR_H */

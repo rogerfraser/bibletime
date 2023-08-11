@@ -1,10 +1,11 @@
+
 /*********
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -122,8 +123,8 @@ void ColorManager::loadColorMaps() {
 QString ColorManager::replaceColors(QString content) {
     auto const activeTemplate(CDisplayTemplateMgr::activeTemplateName());
     static QString const pattern("#%1#");
-    for (auto const & [key, value] : m_colorMaps[activeTemplate])
-        content.replace(pattern.arg(key), value);
+    for (auto const & cp : m_colorMaps[activeTemplate])
+        content.replace(pattern.arg(cp.first), cp.second);
     return content;
 }
 

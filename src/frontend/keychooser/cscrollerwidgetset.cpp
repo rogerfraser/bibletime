@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -55,15 +55,12 @@ CScrollerWidgetSet::CScrollerWidgetSet(QWidget * parent)
     m_layout->addWidget(m_buttonDown, 0);
     setMinimumWidth(WIDTH); // Kludge to add some spacing but seems to work.
 
-    BT_CONNECT(m_scrollButton, &CScrollButton::lock,
-               this, &CScrollerWidgetSet::scroller_pressed);
-    BT_CONNECT(m_scrollButton, &CScrollButton::unlock,
-               this, &CScrollerWidgetSet::scroller_released);
-    BT_CONNECT(m_scrollButton, &CScrollButton::change_requested,
-               this, &CScrollerWidgetSet::change);
-    BT_CONNECT(m_buttonUp, &QToolButton::clicked, [this]{ Q_EMIT change(-1); });
-    BT_CONNECT(m_buttonDown, &QToolButton::clicked,
-               [this]{ Q_EMIT change(1); });
+    BT_CONNECT(m_scrollButton, SIGNAL(lock()), SLOT(slotLock()));
+    BT_CONNECT(m_scrollButton, SIGNAL(unlock()), SLOT(slotUnlock()));
+    BT_CONNECT(m_scrollButton, SIGNAL(change_requested(int)),
+               SLOT(slotScroller(int)));
+    BT_CONNECT(m_buttonUp, SIGNAL(clicked()), SLOT(slotUpClick()));
+    BT_CONNECT(m_buttonDown, SIGNAL(clicked()), SLOT(slotDownClick()));
 }
 
 /** Sets the tooltips for the given entries using the parameters as text. */
@@ -82,7 +79,27 @@ void CScrollerWidgetSet::wheelEvent(QWheelEvent * e) {
     if (delta == 0) {
         e->ignore();
     } else {
-        Q_EMIT change((delta > 0) ? -1 : 1);
+        emit change((delta > 0) ? -1 : 1);
         e->accept();
     }
+}
+
+void CScrollerWidgetSet::slotLock() {
+    emit scroller_pressed();
+}
+
+void CScrollerWidgetSet::slotUnlock() {
+    emit scroller_released();
+}
+
+void CScrollerWidgetSet::slotScroller(int n) {
+    emit change(n);
+}
+
+void CScrollerWidgetSet::slotUpClick() {
+    slotScroller(-1);
+}
+
+void CScrollerWidgetSet::slotDownClick() {
+    slotScroller(1);
 }

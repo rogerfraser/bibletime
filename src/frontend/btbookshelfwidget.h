@@ -2,19 +2,19 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTBOOKSHELFWIDGET_H
+#define BTBOOKSHELFWIDGET_H
 
 #include <QWidget>
 
-#include <memory>
 #include "../backend/bookshelfmodel/btbookshelftreemodel.h"
 
 
@@ -36,40 +36,37 @@ class BtBookshelfWidget: public QWidget {
     public:
         explicit BtBookshelfWidget(QWidget *parent = nullptr, Qt::WindowFlags flags = Qt::WindowFlags());
 
-        void setSourceModel(std::shared_ptr<QAbstractItemModel> model);
+        void setSourceModel(QAbstractItemModel *model);
 
         // Getters for models:
-        BtBookshelfTreeModel * treeModel() const { return m_treeModel; }
-        BtBookshelfFilterModel * postFilterModel() const
-        { return m_postFilterModel; }
+        inline BtBookshelfTreeModel *treeModel() const { return m_treeModel; }
+        inline BtBookshelfFilterModel *postFilterModel() const { return m_postFilterModel; }
 
         // Setters for models:
         void setTreeModel(BtBookshelfTreeModel *model);
 
         // Getters for widgets:
-        QWidget * leftCornerWidget() const { return m_leftCornerWidget; }
-        QLabel * nameFilterLabel() const { return m_nameFilterLabel; }
-        QLineEdit * nameFilterEdit() const { return m_nameFilterEdit; }
-        QToolButton * groupingButton() const { return m_groupingButton; }
-        QToolButton * showHideButton() const { return m_showHideButton; }
-        QWidget * rightCornerWidget() const { return m_rightCornerWidget; }
-        BtBookshelfView * treeView() const { return m_treeView; }
-        BtBookshelfGroupingMenu * groupingMenu() const
-        { return m_groupingMenu; }
-        QMenu * contextMenu() const { return m_contextMenu; }
-        QMenu * itemContextMenu() const { return m_itemContextMenu; }
+        inline QWidget *leftCornerWidget() const { return m_leftCornerWidget; }
+        inline QLabel *nameFilterLabel() const { return m_nameFilterLabel; }
+        inline QLineEdit *nameFilterEdit() const { return m_nameFilterEdit; }
+        inline QToolButton *groupingButton() const { return m_groupingButton; }
+        inline QToolButton *showHideButton() const { return m_showHideButton; }
+        inline QWidget *rightCornerWidget() const { return m_rightCornerWidget; }
+        inline BtBookshelfView *treeView() const { return m_treeView; }
+        inline BtBookshelfGroupingMenu *groupingMenu() const { return m_groupingMenu; }
+        inline QMenu *contextMenu() const { return m_contextMenu; }
+        inline QMenu *itemContextMenu() const { return m_itemContextMenu; }
 
         // Setters for widgets:
         void setLeftCornerWidget(QWidget *w);
         void setRightCornerWidget(QWidget *w);
 
         // Getters for actions:
-        QAction * showHideAction() const { return m_showHideAction; }
+        inline QAction *showHideAction() const { return m_showHideAction; }
 
         // Setters for context menus:
-        void setContextMenu(QMenu * newMenu) { m_contextMenu = newMenu; }
-        void setItemContextMenu(QMenu * newMenu)
-        { m_itemContextMenu = newMenu; }
+        inline void setContextMenu(QMenu *newMenu) { m_contextMenu = newMenu; }
+        inline void setItemContextMenu(QMenu *newMenu) { m_itemContextMenu = newMenu; }
 
         bool eventFilter(QObject *object, QEvent *event) override;
 
@@ -84,9 +81,14 @@ class BtBookshelfWidget: public QWidget {
         void restoreExpanded(const QModelIndex& index, const QStringList& nodeList);
         void retranslateUi();
 
+    protected slots:
+        void slotGroupingActionTriggered(const BtBookshelfTreeModel::Grouping &grouping);
+        void slotShowContextMenu(const QPoint &pos);
+        void slotShowItemContextMenu(CSwordModuleInfo *module, const QPoint &pos);
+
     private:
         // Models:
-        std::shared_ptr<QAbstractItemModel> m_sourceModel;
+        QAbstractItemModel     *m_sourceModel;
         BtBookshelfTreeModel   *m_treeModel;
         BtBookshelfFilterModel *m_postFilterModel;
 
@@ -114,3 +116,5 @@ class BtBookshelfWidget: public QWidget {
         QAction *m_itemUnlockAction;
         QAction *m_itemAboutAction;
 };
+
+#endif // BTBOOKSHELFWIDGET_H

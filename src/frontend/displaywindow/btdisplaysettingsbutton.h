@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTDISPLAYSETTINGSBUTTON_H
+#define BTDISPLAYSETTINGSBUTTON_H
 
 #include <QToolButton>
 
@@ -30,21 +31,22 @@ class BtDisplaySettingsButton: public QToolButton {
     public:
         BtDisplaySettingsButton(QWidget *parent = nullptr);
 
-        void setDisplayOptionsNoRepopulate(
-                DisplayOptions const & displaySettings);
-        void setFilterOptionsNoRepopulate(FilterOptions const & moduleSettings);
-
-    public Q_SLOTS:
-        void setDisplayOptions(DisplayOptions const & displaySettings);
-        void setFilterOptions(FilterOptions const & moduleSettings);
+    public slots:
+        void setDisplayOptions(const DisplayOptions &displaySettings,
+                               bool repopulate = true);
+        void setFilterOptions(const FilterOptions &moduleSettings,
+                              bool repopulate = true);
 
         void setModules(const BtConstModuleList &modules);
 
-    Q_SIGNALS:
+    signals:
         void sigFilterOptionsChanged(FilterOptions filterOptions);
         void sigDisplayOptionsChanged(DisplayOptions displayOptions);
         void sigModulesChanged(const BtConstModuleList &modules);
         void sigChanged();
+
+    protected slots:
+        void slotOptionToggled(QAction *action);
 
     protected:
         void initMenu();
@@ -72,3 +74,5 @@ class BtDisplaySettingsButton: public QToolButton {
         QAction *m_footnotesAction;
         QAction *m_morphSegmentationAction;
 };
+
+#endif

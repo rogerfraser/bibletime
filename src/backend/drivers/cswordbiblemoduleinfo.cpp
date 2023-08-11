@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -28,9 +28,10 @@ CSwordBibleModuleInfo::CSwordBibleModuleInfo(sword::SWModule & module,
         , m_boundsInitialized(false)
         , m_lowerBound(nullptr)
         , m_upperBound(nullptr)
-{}
-
-CSwordBibleModuleInfo::~CSwordBibleModuleInfo() noexcept = default;
+        , m_bookList(nullptr)
+{
+    // Intentionally empty
+}
 
 void CSwordBibleModuleInfo::initBounds() const {
     /// \todo The fields calculated by this method could be cached to disk.
@@ -59,18 +60,19 @@ void CSwordBibleModuleInfo::initBounds() const {
 
 
 /** Returns the books available in this module */
-QStringList const & CSwordBibleModuleInfo::books() const {
+QStringList *CSwordBibleModuleInfo::books() const {
     {
         CSwordBackend & b = backend();
         if (m_cachedLocale != b.booknameLanguage()) {
             // Reset the booklist because the locale has changed
             m_cachedLocale = b.booknameLanguage();
-            m_bookList.reset();
+            delete m_bookList;
+            m_bookList = nullptr;
         }
     }
 
     if (!m_bookList) {
-        m_bookList.emplace();
+        m_bookList = new QStringList();
 
         // Initialize m_hasOT and m_hasNT
         if (!m_boundsInitialized)
@@ -98,7 +100,7 @@ QStringList const & CSwordBibleModuleInfo::books() const {
         }
     }
 
-    return *m_bookList;
+    return m_bookList;
 }
 
 unsigned int CSwordBibleModuleInfo::chapterCount(const unsigned int book) const {

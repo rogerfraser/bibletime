@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -16,7 +16,7 @@
 #include "../../util/btassert.h"
 
 
-BtBookshelfFilterModel::BtBookshelfFilterModel(QObject * const parent)
+BtBookshelfFilterModel::BtBookshelfFilterModel(QObject * parent)
     : QSortFilterProxyModel(parent)
     , m_enabled(true)
     , m_nameFilterRole(BtBookshelfModel::ModuleNameRole)
@@ -29,9 +29,11 @@ BtBookshelfFilterModel::BtBookshelfFilterModel(QObject * const parent)
     , m_categoryFilter(CSwordModuleInfo::AllCategories)
     , m_categoryFilterRole(BtBookshelfModel::ModuleCategoryRole)
     , m_categoryFilterColumn(0)
-{ setDynamicSortFilter(true); }
+{
+    setDynamicSortFilter(true);
+}
 
-void BtBookshelfFilterModel::setEnabled(bool const enable) {
+void BtBookshelfFilterModel::setEnabled(bool enable) {
     if (enable == m_enabled)
         return;
     m_enabled = enable;
@@ -40,28 +42,28 @@ void BtBookshelfFilterModel::setEnabled(bool const enable) {
 
 // Name filter:
 
-void BtBookshelfFilterModel::setNameFilterRole(int const role) {
+void BtBookshelfFilterModel::setNameFilterRole(int role) {
     if (m_nameFilterRole == role)
         return;
     m_nameFilterRole = role;
     invalidateFilter();
 }
 
-void BtBookshelfFilterModel::setNameFilterKeyColumn(int const column) {
+void BtBookshelfFilterModel::setNameFilterKeyColumn(int column) {
     if (m_nameFilterColumn == column)
         return;
     m_nameFilterColumn = column;
     invalidateFilter();
 }
 
-void BtBookshelfFilterModel::setNameFilterFixedString(QString const & filter) {
+void BtBookshelfFilterModel::setNameFilterFixedString(const QString &filter) {
     if (m_nameFilter == filter)
         return;
     m_nameFilter = filter;
     invalidateFilter();
 }
 
-void BtBookshelfFilterModel::setNameFilterCase(Qt::CaseSensitivity const value){
+void BtBookshelfFilterModel::setNameFilterCase(Qt::CaseSensitivity value) {
     if (m_nameFilterCase == value)
         return;
     m_nameFilterCase = value;
@@ -70,28 +72,28 @@ void BtBookshelfFilterModel::setNameFilterCase(Qt::CaseSensitivity const value){
 
 // Hidden filter:
 
-void BtBookshelfFilterModel::setHiddenFilterRole(int const role) {
+void BtBookshelfFilterModel::setHiddenFilterRole(int role) {
     if (m_hiddenFilterRole == role)
         return;
     m_hiddenFilterRole = role;
     invalidateFilter();
 }
 
-void BtBookshelfFilterModel::setHiddenFilterKeyColumn(int const column) {
+void BtBookshelfFilterModel::setHiddenFilterKeyColumn(int column) {
     if (m_hiddenFilterColumn == column)
         return;
     m_hiddenFilterColumn = column;
     invalidateFilter();
 }
 
-void BtBookshelfFilterModel::setShowHidden(bool const show) {
+void BtBookshelfFilterModel::setShowHidden(bool show) {
     if (m_showHidden == show)
         return;
     m_showHidden = show;
     invalidateFilter();
 }
 
-void BtBookshelfFilterModel::setShowShown(bool const show) {
+void BtBookshelfFilterModel::setShowShown(bool show) {
     if (m_showShown == show)
         return;
     m_showShown = show;
@@ -100,14 +102,14 @@ void BtBookshelfFilterModel::setShowShown(bool const show) {
 
 // Category filter:
 
-void BtBookshelfFilterModel::setCategoryFilterRole(int const role) {
+void BtBookshelfFilterModel::setCategoryFilterRole(int role) {
     if (m_categoryFilterRole == role)
         return;
     m_categoryFilterRole = role;
     invalidateFilter();
 }
 
-void BtBookshelfFilterModel::setCategoryFilterKeyColumn(int const column) {
+void BtBookshelfFilterModel::setCategoryFilterKeyColumn(int column) {
     if (m_categoryFilterColumn == column)
         return;
     m_categoryFilterColumn = column;
@@ -115,7 +117,7 @@ void BtBookshelfFilterModel::setCategoryFilterKeyColumn(int const column) {
 }
 
 void BtBookshelfFilterModel::setShownCategories(
-        CSwordModuleInfo::Categories const & categories)
+        const CSwordModuleInfo::Categories & categories)
 {
     if (m_categoryFilter == categories)
         return;
@@ -126,7 +128,7 @@ void BtBookshelfFilterModel::setShownCategories(
 // Filtering:
 
 bool BtBookshelfFilterModel::filterAcceptsRow(int row,
-                                              QModelIndex const & parent) const
+                                              const QModelIndex & parent) const
 {
     if (!m_enabled)
         return true;
@@ -140,72 +142,68 @@ bool BtBookshelfFilterModel::filterAcceptsRow(int row,
     return true;
 }
 
-bool BtBookshelfFilterModel::nameFilterAcceptsRow(
-        int row,
-        QModelIndex const & parent) const
+bool BtBookshelfFilterModel::nameFilterAcceptsRow(int row,
+                                                  const QModelIndex & parent) const
 {
     if (m_nameFilter.isEmpty())
         return true;
 
-    auto const * const m = sourceModel();
+    const QAbstractItemModel * const m = sourceModel();
     BT_ASSERT(m);
 
-    auto const itemIndex = m->index(row, m_nameFilterColumn, parent);
-    auto const numChildren = m->rowCount(itemIndex);
+    QModelIndex itemIndex(m->index(row, m_nameFilterColumn, parent));
+    int numChildren(m->rowCount(itemIndex));
     if (numChildren == 0) {
-        auto const data = m->data(itemIndex, m_nameFilterRole);
+        QVariant data(m->data(itemIndex, m_nameFilterRole));
         return data.toString().contains(m_nameFilter, m_nameFilterCase);
     }
 
-    for (int i = 0; i < numChildren; ++i)
+    for (int i = 0; i < numChildren; i++)
         if (filterAcceptsRow(i, itemIndex))
             return true;
     return false;
 }
 
-bool BtBookshelfFilterModel::hiddenFilterAcceptsRow(
-        int row,
-        QModelIndex const & parent) const
+bool BtBookshelfFilterModel::hiddenFilterAcceptsRow(int row,
+                                                    const QModelIndex & parent) const
 {
     if (m_showHidden && m_showShown)
         return true;
 
-    auto const * const m = sourceModel();
+    const QAbstractItemModel * const m = sourceModel();
     BT_ASSERT(m);
 
-    auto const itemIndex = m->index(row, m_hiddenFilterColumn, parent);
-    auto const numChildren = m->rowCount(itemIndex);
+    const QModelIndex itemIndex = m->index(row, m_hiddenFilterColumn, parent);
+    const int numChildren = m->rowCount(itemIndex);
     if (numChildren == 0) {
-        if (static_cast<Qt::CheckState>(m->data(itemIndex,
-                                                m_hiddenFilterRole).toBool()))
+        if (static_cast<Qt::CheckState>(m->data(itemIndex, m_hiddenFilterRole).toBool()))
             return m_showHidden;
         return m_showShown;
     }
 
-    for (int i = 0; i < numChildren; ++i)
+    for (int i = 0; i < numChildren; i++)
         if (filterAcceptsRow(i, itemIndex))
             return true;
     return false;
 }
 
-bool BtBookshelfFilterModel::categoryFilterAcceptsRow(
-        int row,
-        QModelIndex const & parent) const
+bool BtBookshelfFilterModel::categoryFilterAcceptsRow(int row,
+                                                      const QModelIndex & parent) const
 {
     if (m_categoryFilter == CSwordModuleInfo::AllCategories)
         return true;
 
-    auto const * const m = sourceModel();
+    const QAbstractItemModel * const m = sourceModel();
     BT_ASSERT(m);
 
-    auto const itemIndex = m->index(row, m_categoryFilterColumn, parent);
-    auto const numChildren = m->rowCount(itemIndex);
-    if (numChildren == 0)
-        return m_categoryFilter.testFlag(
-                    static_cast<CSwordModuleInfo::Category>(
-                        m->data(itemIndex, m_categoryFilterRole).toInt()));
+    const QModelIndex itemIndex(m->index(row, m_categoryFilterColumn, parent));
+    const int numChildren(m->rowCount(itemIndex));
+    if (numChildren == 0) {
+        const int cat = m->data(itemIndex, m_categoryFilterRole).toInt();
+        return m_categoryFilter.testFlag(static_cast<CSwordModuleInfo::Category>(cat));
+    }
 
-    for (int i = 0; i < numChildren; ++i)
+    for (int i = 0; i < numChildren; i++)
         if (filterAcceptsRow(i, itemIndex))
             return true;
     return false;

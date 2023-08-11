@@ -2,18 +2,18 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BT_DISPLAY_VIEW_INTERFACE_H
+#define BT_DISPLAY_VIEW_INTERFACE_H
 
 #include <memory>
-#include <optional>
 #include <QFont>
 #include <QList>
 #include <QObject>
@@ -29,6 +29,13 @@ class CSwordModuleInfo;
 
 class QTimer;
 class RoleItemModel;
+
+struct RefIndexes {
+    QString r1;
+    QString r2;
+    int index1;
+    int index2;
+};
 
 /**
  * /brief This class provides communications between QML and c++.
@@ -85,6 +92,7 @@ public:
     Q_INVOKABLE void clearSelectedText();
     Q_INVOKABLE bool hasSelectedText();
     Q_INVOKABLE void saveSelectedText(int index, const QString& text);
+    Q_INVOKABLE void setBoundsMovement();
     Q_INVOKABLE void setKeyFromLink(const QString& link);
     Q_INVOKABLE bool shiftKeyDown();
     Q_INVOKABLE int indexToVerse(int index);
@@ -104,8 +112,8 @@ public:
     QColor getForegroundColor() const;
     int getBackgroundHighlightColorIndex() const;
     void changeColorTheme();
-    void copyRange(int index1, int index2) const;
-    void copyVerseRange(const QString& ref1, const QString& ref2, const CSwordModuleInfo * module) const;
+    void copyRange(int index1, int index2);
+    void copyVerseRange(const QString& ref1, const QString& ref2, const CSwordModuleInfo * module);
     QString getBibleUrlFromLink(const QString& url);
     int getContextMenuIndex() const;
     int getContextMenuColumn() const;
@@ -132,7 +140,6 @@ public:
     QVariant getTextModel();
     bool isBibleOrCommentary();
     BtModuleTextModel * textModel();
-    BtModuleTextModel const * textModel() const;
     void pageDown();
     void pageUp();
     void referenceChoosen();
@@ -146,7 +153,7 @@ public:
     void setModules(const QStringList &modules);
     void settingsChanged();
 
-Q_SIGNALS:
+signals:
     void activeLinkChanged();
     void backgroundColorChanged();
     void backgroundHighlightColorChanged();
@@ -170,19 +177,21 @@ Q_SIGNALS:
     void updateReference(const QString& reference);
     void dragOccuring(const QString& moduleName, const QString& keyName);
 
-private Q_SLOTS:
+private slots:
+    void timeoutEvent();
     void slotSetHighlightWords();
 
 private:
     void configModuleByType(const QString& type, const QStringList& availableModuleNames);
-    bool copyKey(CSwordKey const * const key, Format const format, bool const addText) const;
+    bool copyKey(CSwordKey const * const key, Format const format, bool const addText);
     QString decodeLemma(const QString& value);
     QString decodeMorph(const QString& value);
     QFont font(int column) const;
     void getFontsFromSettings();
     QString getReferenceFromUrl(const QString& url);
     const CSwordModuleInfo* module() const;
-    static std::unique_ptr<Rendering::CTextRendering> newRenderer(Format const format, bool const addText);
+    std::unique_ptr<Rendering::CTextRendering> newRenderer(Format const format, bool const addText);
+    RefIndexes normalizeReferences(const QString& ref1, const QString& ref2);
     QString stripHtml(const QString& html);
 
     bool m_firstHref;
@@ -200,7 +209,9 @@ private:
     int m_contextMenuIndex;
     int m_contextMenuColumn;
     QString m_activeLink;
-    std::optional<FindState> m_findState;
+    FindState m_findState;
     QTimer m_timer;
     QMap<int, QString> m_selectedText;
 };
+
+#endif

@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CKEYCHOOSERWIDGET_H
+#define CKEYCHOOSERWIDGET_H
 
 #include <QComboBox>
 
@@ -42,7 +43,7 @@ protected: /* Methods: */
 
     bool eventFilter(QObject * o, QEvent * e) override;
 
-Q_SIGNALS:
+signals:
 
     /**
     * Emitted when the user moves the focus away from the combo by pressing tab
@@ -112,7 +113,27 @@ public: /* Methods: */
         return *m_comboBox;
     }
 
-Q_SIGNALS:
+public slots:
+
+    /**
+    * is called to lock the combobox
+    */
+    void lock();
+
+    /**
+    * is called to unlock the combobox
+    */
+    void unlock();
+
+    /**
+    * is called to move the combobox to a certain index
+    * @param index the index to jump to
+    */
+    void changeCombo(int index);
+
+    void slotComboChanged(int index);
+
+signals:
 
     /**
     * Is emitted if the widget changed, but
@@ -127,6 +148,13 @@ Q_SIGNALS:
     * @param index The new index of the ComboBox
     */
     void focusOut(int index);
+
+protected slots:
+
+    /**
+    * Is called when the return key was presed in the combobox.
+    */
+    void slotReturnPressed();
 
 private: /* Fields: */
 
@@ -148,3 +176,5 @@ private: /* Fields: */
     QString m_oldKey;
 
 };
+
+#endif

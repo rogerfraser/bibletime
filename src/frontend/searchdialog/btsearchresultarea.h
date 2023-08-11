@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTSEARCHRESULTAREA_H
+#define BTSEARCHRESULTAREA_H
 
 #include <QList>
 #include <QSplitter>
@@ -18,6 +19,7 @@
 #include <QWidget>
 #include "../../backend/managers/cswordbackend.h"
 #include "../../backend/cswordmodulesearch.h"
+#include "../display/creaddisplay.h"
 #include "analysis/csearchanalysisdialog.h"
 #include "../bttextbrowser.h"
 
@@ -27,10 +29,8 @@ class CModuleResultView;
 class CSearchResultView;
 }
 class CSwordModuleInfo;
-class QAction;
 class QFrame;
 class QHBoxLayout;
-class QMenu;
 class QTreeWidget;
 
 namespace Search {
@@ -50,22 +50,22 @@ namespace Search {
 */
 class StrongsResult {
     public: /* Methods: */
-        StrongsResult() {}
-        StrongsResult(QString const & text,
-                      QString const & keyName)
+        inline StrongsResult() {}
+        inline StrongsResult(const QString &text,
+                             const QString &keyName)
             : m_text(text)
         {
             m_keyNameList.append(keyName);
         }
 
         const QString &keyText() const { return m_text; }
-        int keyCount() const { return m_keyNameList.count(); }
-        void addKeyName(QString const & keyName) {
+        inline int keyCount() const { return m_keyNameList.count(); }
+        inline void addKeyName(const QString &keyName) {
             if (m_keyNameList.contains(keyName)) return;
             m_keyNameList.append(keyName);
         }
 
-        QStringList const & getKeyList() const { return m_keyNameList; }
+        inline const QStringList &getKeyList() const { return m_keyNameList; }
 
     private: /* Fields: */
         QString m_text;
@@ -80,9 +80,9 @@ class StrongsResult {
 */
 class StrongsResultList: public QList<StrongsResult> {
     public: /* Methods: */
-        StrongsResultList(CSwordModuleInfo const *module,
-                          CSwordModuleSearch::ModuleResultList const & results,
-                          QString const & strongsNumber);
+        StrongsResultList(const CSwordModuleInfo *module,
+                          const sword::ListKey &results,
+                          const QString &strongsNumber);
 
     private: /* Methods: */
         QString getStrongsNumberText(const QString &verseContent,
@@ -98,12 +98,13 @@ class BtSearchResultArea : public QWidget {
         Q_OBJECT
     public: /* Methods: */
         BtSearchResultArea(QWidget *parent = nullptr);
-        ~BtSearchResultArea() override { saveDialogSettings(); }
+        inline ~BtSearchResultArea() override { saveDialogSettings(); }
 
         /**
         * Sets the modules which contain the result of each.
         */
-        void setSearchResult(CSwordModuleSearch::Results results);
+        void setSearchResult(
+            const CSwordModuleSearch::Results &results);
 
         QSize sizeHint() const override {
             return baseSize();
@@ -113,16 +114,22 @@ class BtSearchResultArea : public QWidget {
             return minimumSize();
         }
 
-    public Q_SLOTS:
+    public slots:
         /**
         * Resets the current list of modules and the displayed list of found entries.
         */
         void reset();
 
-        /** Shows a dialog with the search analysis of the current search. */
-        void showAnalysis() { CSearchAnalysisDialog(m_results, this).exec(); }
-
     protected: /* Methods: */
+        /**
+        * Initializes the view of this widget.
+        */
+        void initView();
+
+        /**
+        * Initializes the signal slot conections of the child widgets
+        */
+        void initConnections();
 
         /**
         * Load the settings from the resource file
@@ -136,7 +143,7 @@ class BtSearchResultArea : public QWidget {
 
         void setBrowserFont(const CSwordModuleInfo* const module);
 
-    protected Q_SLOTS:
+    protected slots:
         /**
         * Update the preview of the selected key.
         */
@@ -148,11 +155,25 @@ class BtSearchResultArea : public QWidget {
         void clearPreview();
 
         /**
+        * Shows a dialog with the search analysis of the current search.
+        */
+        inline void showAnalysis() {
+            CSearchAnalysisDialog(m_results, this).exec();
+        }
+
+        /**
+        * Select all text
+        */
+        inline void selectAll() { m_previewDisplay->selectAll(); }
+
+        /**
         * Copy selected text
         */
-        void copySelection() {
+        inline void copySelection() {
             m_previewDisplay->copy();
         }
+
+        void slotContextMenu(const QPoint& point);
 
     private: /* Fields: */
         CSwordModuleSearch::Results m_results;
@@ -161,15 +182,12 @@ class BtSearchResultArea : public QWidget {
         CSearchResultView* m_resultListBox;
 
         QFrame *m_displayFrame;
-
-        QMenu * m_contextMenu;
-            QAction * m_selectAllAction;
-            QAction * m_copyAction;
-
-        BtTextBrowser* m_previewDisplay;
+        BtTextBrowser * m_previewDisplay;
 
         QSplitter *m_mainSplitter;
         QSplitter *m_resultListSplitter;
 };
 
 } //namespace Search
+
+#endif

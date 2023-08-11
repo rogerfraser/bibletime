@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -30,28 +30,34 @@
 #include "bttoolbarpopupaction.h"
 
 
-void CBookReadWindow::applyProfileSettings(BtConfigCore const & conf) {
-    CDisplayWindow::applyProfileSettings(conf);
+void CBookReadWindow::applyProfileSettings(const QString & windowGroup) {
+    CLexiconReadWindow::applyProfileSettings(windowGroup);
 
     BT_ASSERT(m_treeAction);
-    if (conf.value<bool>("treeShown", true) != m_treeAction->isChecked())
+    BT_ASSERT(windowGroup.endsWith('/'));
+    if (btConfig().sessionValue<bool>(windowGroup + "treeShown", true) != m_treeAction->isChecked())
         m_treeAction->activate(QAction::Trigger);
 }
 
-void CBookReadWindow::storeProfileSettings(BtConfigCore & conf) const {
-    CDisplayWindow::storeProfileSettings(conf);
-    conf.setValue("treeShown", m_treeAction->isChecked());
+void CBookReadWindow::storeProfileSettings(QString const & windowGroup) const {
+    CLexiconReadWindow::storeProfileSettings(windowGroup);
+
+    BT_ASSERT(windowGroup.endsWith('/'));
+    btConfig().setSessionValue(windowGroup + "treeShown", m_treeAction->isChecked());
 }
 
 void CBookReadWindow::initActions() {
-    CDisplayWindow::initActions();
+    CLexiconReadWindow::initActions();
     BtActionCollection* ac = actionCollection();
     insertKeyboardActions(ac);
 
+    //cleanup, not a clean oo-solution
+    ac->action("nextEntry").setEnabled(false);
+    ac->action("previousEntry").setEnabled(false);
+
     m_treeAction = &ac->action("toggleTree");
     BT_ASSERT(m_treeAction);
-    BT_CONNECT(m_treeAction, &QAction::triggered,
-               this, &CBookReadWindow::treeToggled);
+    BT_CONNECT(m_treeAction, SIGNAL(triggered()), this, SLOT(treeToggled()));
     addAction(m_treeAction);
 
     ac->readShortcuts("Book shortcuts");
@@ -69,14 +75,14 @@ void CBookReadWindow::insertKeyboardActions( BtActionCollection* const a ) {
 
 /** No descriptions */
 void CBookReadWindow::initConnections() {
-    CDisplayWindow::initConnections();
+    CLexiconReadWindow::initConnections();
 
-    BT_CONNECT(m_treeChooser, &CBookTreeChooser::keyChanged,
-               this,          &CBookReadWindow::lookupSwordKey);
-    BT_CONNECT(m_treeChooser, &CBookTreeChooser::keyChanged,
-               keyChooser(),  &CKeyChooser::updateKey);
-    BT_CONNECT(keyChooser(),  &CKeyChooser::keyChanged,
-               m_treeChooser, &CBookTreeChooser::updateKey);
+    BT_CONNECT(m_treeChooser, SIGNAL(keyChanged(CSwordKey *)),
+               this,          SLOT(lookupSwordKey(CSwordKey *)));
+    BT_CONNECT(m_treeChooser, SIGNAL(keyChanged(CSwordKey *)),
+               keyChooser(),  SLOT(updateKey(CSwordKey *)));
+    BT_CONNECT(keyChooser(),  SIGNAL(keyChanged(CSwordKey *)),
+               m_treeChooser, SLOT(updateKey(CSwordKey *)));
 }
 
 /** Init the view */
@@ -87,7 +93,8 @@ void CBookReadWindow::initView() {
     m_treeChooser->hide();
     splitter->setStretchFactor(1,3);
 
-    if (auto * const disp = displayWidget())
+    BtModelViewReadDisplay* disp = dynamic_cast<BtModelViewReadDisplay*>(displayWidget());
+    if (disp)
         disp->setModules(getModuleList());
 
     // Create Navigation toolbar
@@ -138,10 +145,10 @@ void CBookReadWindow::setupMainWindowToolBars() {
     btMainWindow()->navToolBar()->addAction(m_actions.forwardInHistory); //2nd button
     CKeyChooser* keyChooser = CKeyChooser::createInstance(modules(), history(), key(), btMainWindow()->navToolBar() );
     btMainWindow()->navToolBar()->addWidget(keyChooser);
-    BT_CONNECT(keyChooser, &CKeyChooser::keyChanged,
-               this,       &CBookReadWindow::lookupSwordKey);
-    BT_CONNECT(this,       &CBookReadWindow::sigKeyChanged,
-               keyChooser, &CKeyChooser::updateKey);
+    BT_CONNECT(keyChooser, SIGNAL(keyChanged(CSwordKey *)),
+               this,       SLOT(lookupSwordKey(CSwordKey *)));
+    BT_CONNECT(this,       SIGNAL(sigKeyChanged(CSwordKey *)),
+               keyChooser, SLOT(updateKey(CSwordKey *)));
 
     // Works toolbar
     btMainWindow()->worksToolBar()->setModules(getModuleList(), modules().first()->type(), this);
@@ -169,6 +176,14 @@ void CBookReadWindow::treeToggled() {
 
 /** Reimplementation to take care of the tree chooser. */
 void CBookReadWindow::modulesChanged() {
-    CDisplayWindow::modulesChanged();
+    CLexiconReadWindow::modulesChanged();
     m_treeChooser->setModules(modules());
+}
+
+void CBookReadWindow::setupPopupMenu() {
+    CLexiconReadWindow::setupPopupMenu();
+}
+
+void CBookReadWindow::reload(CSwordBackend::SetupChangedReason reason) {
+    CLexiconReadWindow::reload(reason);
 }

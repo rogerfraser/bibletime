@@ -2,16 +2,17 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
 import BibleTime 1.0
-import QtQuick 2.10
+import QtQuick 2.9
+import QtQml 2.3
 
 Rectangle {
     id: display
@@ -253,10 +254,12 @@ Rectangle {
 
         onPageDownChanged: {
             listView.scroll(listView.height * 0.8);
+            listView.returnToBounds()
             updateReferenceText();
         }
         onPageUpChanged: {
             listView.scroll(listView.height * -0.8);
+            listView.returnToBounds()
             updateReferenceText();
         }
         onPositionItemOnScreen: {
@@ -266,6 +269,7 @@ Rectangle {
     }
 
     ListView {
+        objectName: "DisplayListView"
         id: listView
 
         property color textColor: btQmlInterface.foregroundColor
@@ -308,13 +312,16 @@ Rectangle {
         anchors.rightMargin: 0
         anchors.topMargin: 0
         anchors.bottomMargin: 0
-        boundsMovement: Flickable.StopAtBounds
         focus: true
         maximumFlickVelocity: 900
         model: btQmlInterface.textModel
         spacing: 2
         highlightFollowsCurrentItem: true
         currentIndex: btQmlInterface.currentModelIndex
+        Component.onCompleted: {
+            btQmlInterface.setBoundsMovement();
+        }
+
         onCurrentIndexChanged: {
             positionViewAtIndex(currentIndex,ListView.Beginning)
         }

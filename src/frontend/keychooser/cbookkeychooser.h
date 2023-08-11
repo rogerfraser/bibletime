@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CBOOKKEYCHOOSER_H
+#define CBOOKKEYCHOOSER_H
 
 #include "ckeychooser.h"
 
@@ -22,58 +23,66 @@ class CSwordBookModuleInfo;
 class CSwordKey;
 class CSwordTreeKey;
 
-class CBookKeyChooser final : public CKeyChooser {
+/**
+  \brief The keychooser implementation for books.
+*/
+class CBookKeyChooser: public CKeyChooser {
 
     Q_OBJECT
 
 public:
 
-    CBookKeyChooser(BtConstModuleList const & modules,
+    CBookKeyChooser(const BtConstModuleList & modules,
                     BTHistory * history,
                     CSwordKey * key = nullptr,
                     QWidget * parent = nullptr);
 
-    void refreshContent() final override;
+    void refreshContent() override;
 
-    void setModules(BtConstModuleList const & modules,
-                    bool refresh = false) final override;
-    CSwordKey * key() final override;
+    void setModules(const BtConstModuleList & modules,
+                    bool refresh = false) override;
+    CSwordKey * key() override;
 
-    void setKey(CSwordKey * key) final override;
+    void setKey(CSwordKey * key) override;
 
-    /** \brief Sets a new key to this keychooser. */
-    void setKey(CSwordKey * key, bool const emitSignal);
+    /**
+    * Sets a new key to this keychooser
+    */
+    void setKey(CSwordKey * key, const bool emitSignal);
 
-public Q_SLOTS:
+public slots: // Public slots
 
-    /** \brief Updates the keychoosers for the given key but emit no signal. */
-    void updateKey(CSwordKey * key) final override;
+    /**
+    * Updates the keychoosers for the given key but emit no signal.
+    */
+    void updateKey(CSwordKey * key) override;
 
 protected: /* Methods: */
 
     /**
-       Fills the combo given by depth with the items from the key having depth
-       "depth". The parent sibling is given by key.
+    * Fills the combo given by depth with the items from the key having depth "depth".
+    * The parent sibling is given by key.
     */
-    void setupCombo(QString const & key,
-                    int const depth,
-                    int const currentItem);
+    void setupCombo(const QString & key, const int depth, const int currentItem);
 
-private: /* Methods: */
+    void adjustFont() override;
 
-    void adjustFont();
-    void handleHistoryMoved(QString const & newKey) final override;
+protected slots:
 
-private Q_SLOTS:
-
-    /** \brief A keychooser changed. Update and emit a signal if necessary. */
+    /**
+    * A keychooser changed. Update and emit a signal if necessary.
+    */
     void keyChooserChanged(int);
+
+    void setKey(const QString & newKey) override;
 
 private: /* Fields: */
 
     QList<CKeyChooserWidget *> m_chooserWidgets;
-    QList<CSwordBookModuleInfo const *> m_modules;
+    QList<const CSwordBookModuleInfo *> m_modules;
     CSwordTreeKey * m_key;
     QHBoxLayout * m_layout;
 
-}; /* class CBookKeyChooser */
+};
+
+#endif

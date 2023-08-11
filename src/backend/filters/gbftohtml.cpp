@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -20,10 +20,7 @@
 #include "../managers/cswordbackend.h"
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <utilxml.h>
-#pragma GCC diagnostic pop
 
 
 Filters::GbfToHtml::GbfToHtml() : sword::GBFHTML() {
@@ -129,7 +126,8 @@ char Filters::GbfToHtml::processText(sword::SWBuf& buf, const sword::SWKey * key
     tag = QRegExp("<W([HGT])([^>]*)>");
     tag.setMinimal(true);
 
-    for (auto e : list) { // for each entry to process
+    for (QStringList::iterator it = list.begin(); it != list.end(); ++it) {
+        QString e = (*it); //current entry to process
         //qWarning(e.latin1());
 
         //check if there is a word to which the strongs info belongs to.
@@ -140,7 +138,7 @@ char Filters::GbfToHtml::processText(sword::SWBuf& buf, const sword::SWKey * key
         const bool textPresent = (e.trimmed().remove(QRegExp("[.,;:]")).left(2) != "<W");
 
         if (!textPresent) {
-            result += e;
+            result += (*it);
             continue;
         }
 

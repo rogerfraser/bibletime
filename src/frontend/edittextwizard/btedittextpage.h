@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BT_EDIT_TEXT_PAGE
+#define BT_EDIT_TEXT_PAGE
 
 #include <QWizardPage>
 #include <QTextCharFormat>
@@ -26,7 +27,7 @@ class BtEditTextPage final: public QWizardPage {
 
 public: /* Methods: */
 
-    BtEditTextPage(QWidget * parent = nullptr);
+    BtEditTextPage(QWidget * parent = 0);
 
     void setFont(const QFont& font);
     void setText(const QString& text);
@@ -37,7 +38,21 @@ public: /* Methods: */
     void initializePage() final override;
     bool validatePage() final override;
 
-Q_SIGNALS:
+private slots:
+    void toggleBold(bool checked);
+    void toggleItalic(bool checked);
+    void toggleUnderline(bool checked);
+
+    void alignLeft(bool);
+    void alignCenter(bool);
+    void alignRight(bool);
+
+    void slotFontFamilyChosen(const QFont&);
+    void slotFontSizeChosen(int);
+
+    void slotCurrentCharFormatChanged(const QTextCharFormat &);
+
+signals:
 
     void signalFontChanged(const QFont &);
     void signalFontColorChanged(const QColor &);
@@ -72,3 +87,5 @@ private:
     }
     m_actions;
 };
+
+#endif

@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -23,15 +23,17 @@ BtVerseKeyMenu::BtVerseKeyMenu(QWidget* parent)
         , m_timerId(0)
         , m_firstClickLock(true)
 {
-    BT_CONNECT(this, &QMenu::aboutToShow,
-               [this] {
-                   m_firstClickLock = true;
-                   if (m_timerId) {
-                       killTimer(m_timerId);
-                       m_timerId = 0;
-                   }
-                   m_timerId = startTimer(300);
-               });
+    BT_CONNECT(this, SIGNAL(aboutToShow()),
+               this, SLOT(startFirstClickDelayTimer()));
+}
+
+void BtVerseKeyMenu::startFirstClickDelayTimer() {
+    m_firstClickLock = true;
+    if (m_timerId) {
+        killTimer(m_timerId);
+        m_timerId = 0;
+    }
+    m_timerId = startTimer(300);
 }
 
 void BtVerseKeyMenu::timerEvent(QTimerEvent* e) {

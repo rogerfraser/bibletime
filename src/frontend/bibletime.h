@@ -2,40 +2,38 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BIBLETIME_H
+#define BIBLETIME_H
 
 #include <QMainWindow>
 
 #include <QList>
 #include <QTimer>
+#include "displaywindow/cdisplaywindow.h"
 #ifndef NDEBUG
-#include <mutex>
+#include <QMutex>
 #endif
-#include "../backend/drivers/cswordmoduleinfo.h"
 
 
 namespace InfoDisplay {
 class CInfoDisplay;
 }
 class BtActionClass;
-class BtActionCollection;
 class BtBookshelfDockWidget;
 class BtFindWidget;
-class BtModuleChooserBar;
-class BtModelViewReadDisplay;
 class BtOpenWorkAction;
 class CBookmarkIndex;
 class CDisplayWindow;
-class CKeyChooser;
 class CMDIArea;
+class CSwordModuleInfo;
 class QAction;
 class QLabel;
 class QMdiSubWindow;
@@ -43,6 +41,12 @@ class QMenu;
 class QActionGroup;
 class QToolBar;
 class QSplitter;
+
+struct AutoScroll {
+    bool enabled;
+    bool paused;
+    int speed;
+};
 
 /**
   * @page backend The structure of the backend
@@ -99,9 +103,9 @@ class QSplitter;
   * </p>
   */
 
-/** @mainpage BibleTime - Source Code Documentation
+/** @mainpage BibleTime - sourcecode documentation
  * BibleTime main page.
- * <p>This is the source code documentation of BibleTime, a Bible study tool.
+ * <p>This is the sourcecode documentation of BibleTime, a Bible study tool.
  * <p>
  * The main class of BibleTime is called @ref BibleTime, which is the main window
  * and initializes all important parts at startup.
@@ -138,7 +142,7 @@ class BibleTime : public QMainWindow {
 
         ~BibleTime() override;
 
-        static BibleTime * instance() { return m_instance; }
+        static inline BibleTime *instance() { return m_instance; }
 
         /**
         *  Save the configuration dialog settings, don't open dialog
@@ -147,21 +151,28 @@ class BibleTime : public QMainWindow {
         /**
         * Get pointer to Navigation toolbar
         */
-        QToolBar * navToolBar() const { return m_navToolBar; }
+        inline QToolBar *navToolBar() const {
+            return m_navToolBar;
+        }
         /**
         * Get pointer to Works toolbar
         */
-        BtModuleChooserBar * worksToolBar() const { return m_worksToolBar; }
+        inline BtModuleChooserBar *worksToolBar() const {
+            return m_worksToolBar;
+        }
         /**
         * Get pointer to Tools toolbar
         */
-        QToolBar * toolsToolBar() const { return m_toolsToolBar; }
+        inline QToolBar *toolsToolBar() const {
+            return m_toolsToolBar;
+        }
 
         /**
           \returns a pointer to the info display.
         */
-        InfoDisplay::CInfoDisplay * infoDisplay() const
-        { return m_infoDisplay; }
+        inline InfoDisplay::CInfoDisplay *infoDisplay() const {
+            return m_infoDisplay;
+        }
 
         /**
         * Clears the actions of the MDI related toolbars
@@ -190,7 +201,7 @@ class BibleTime : public QMainWindow {
         /**
           Get a pointer to the display associated with the current window
         */
-        BtModelViewReadDisplay * getCurrentDisplay();
+        CDisplay* getCurrentDisplay();
         /**
           Open the BtFindWidget below the mdi area
         */
@@ -200,7 +211,7 @@ class BibleTime : public QMainWindow {
           */
         void setDisplayFocus();
 
-public Q_SLOTS:
+public slots:
         /**
         * Opens the optionsdialog of BibleTime.
         */
@@ -292,7 +303,12 @@ public Q_SLOTS:
         */
         void refreshDisplayWindows() const;
 
-    protected Q_SLOTS:
+        /**
+        * Reimplemented from QWidget.
+        */
+        void closeEvent(QCloseEvent *event) override;
+
+    protected slots:
         /**
          * Creates a new presenter in the MDI area according to the type of the module.
          */
@@ -375,6 +391,13 @@ public Q_SLOTS:
         void autoScrollDown();
         void autoScrollPause();
         bool autoScrollAnyKey(int key);
+        void autoScrollEnablePauseAction(bool enable);
+
+        /**
+        * Is called when settings in the optionsdialog have been
+        * changed (ok or apply)
+        */
+        void slotSettingsChanged();
 
         /**
          * Called when search button is pressed
@@ -398,7 +421,7 @@ public Q_SLOTS:
         */
         void slotOpenAboutDialog();
 
-    Q_SIGNALS:
+    signals:
         void toggledTextWindowHeader(bool newState);
         void toggledTextWindowNavigator(bool newState);
         void toggledTextWindowToolButtons(bool newState);
@@ -490,11 +513,7 @@ public Q_SLOTS:
         CMDIArea* m_mdi;
         BtFindWidget* m_findWidget;
 
-        struct {
-            bool enabled;
-            bool paused;
-            int speed;
-        } m_autoScroll;
+        AutoScroll m_autoScroll;
         QTimer m_autoScrollTimer;
 
 
@@ -533,6 +552,8 @@ public Q_SLOTS:
     private:
         QAction *m_debugWidgetAction;
         static QLabel *m_debugWindow;
-        static std::mutex m_debugWindowLock;
+        static QMutex m_debugWindowLock;
 #endif
 };
+
+#endif

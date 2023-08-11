@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTBOOKSHELFWIZARD_H
+#define BTBOOKSHELFWIZARD_H
 
 #include <QWizard>
 
@@ -55,7 +56,7 @@ public: /* Methods: */
     void downloadStarted();
     void downloadFinished();
 
-public Q_SLOTS:
+public slots:
 
     void accept() final override;
 
@@ -83,3 +84,5 @@ private: /* Fields: */
     BtBookshelfInstallFinalPage * const m_installFinalPage;
 
 }; /* class BtBookshelfWizard */
+
+#endif

@@ -2,27 +2,23 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CSWORDLDKEY_H
+#define CSWORDLDKEY_H
 
 #include "cswordkey.h"
 
 #include <QString>
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wextra-semi"
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <swkey.h>
-#pragma GCC diagnostic pop
 
 
 class CSwordModuleInfo;
@@ -55,7 +51,7 @@ class CSwordModuleInfo;
   * @version $Id: cswordldkey.h,v 1.24 2006/02/25 11:38:15 joachim Exp $
   */
 
-class CSwordLDKey final : public CSwordKey {
+class CSwordLDKey : public CSwordKey, public sword::SWKey {
 
     public:
 
@@ -73,9 +69,7 @@ class CSwordLDKey final : public CSwordKey {
         */
         CSwordLDKey(const sword::SWKey *k, const CSwordModuleInfo *module);
 
-        sword::SWKey const & asSwordKey() const noexcept final override;
-
-        CSwordLDKey* copy() const final override;
+        CSwordLDKey* copy() const override;
         /**
         * Uses the parameter to returns the next entry afer this key.
         */
@@ -85,20 +79,20 @@ class CSwordLDKey final : public CSwordKey {
         */
         CSwordLDKey* PreviousEntry();
 
-        void setModule(const CSwordModuleInfo *module) final override;
+        void setModule(const CSwordModuleInfo *module) override;
 
-        QString key() const final override;
+        QString key() const override;
 
-        bool setKey(const QString &newKey) final override;
+        bool setKey(const QString &newKey) override;
 
-        bool setKey(const char *key) final override;
+        bool setKey(const char *key) override;
 
     protected:
 
-        const char* rawKey() const final override;
-
-    private: /* Fields: */
-
-        sword::SWKey m_key;
+        const char* rawKey() const override;
 
 };
+
+
+#endif
+

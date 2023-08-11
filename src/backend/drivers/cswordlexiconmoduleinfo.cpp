@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -21,12 +21,7 @@
 #include "../../util/directory.h"
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wextra-semi"
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <swmodule.h>
-#pragma GCC diagnostic pop
 
 
 //Change it once the format changed to make all systems rebuild their caches
@@ -122,8 +117,6 @@ const QStringList &CSwordLexiconModuleInfo::entries() const {
 
     return m_entries;
 }
-
-bool CSwordLexiconModuleInfo::snap() const { return module().getRawEntry(); }
 
 void CSwordLexiconModuleInfo::testForStrongsKeys() {
     auto & m = module();

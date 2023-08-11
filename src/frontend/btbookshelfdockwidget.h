@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTBOOKSHELFDOCKWIDGET_H
+#define BTBOOKSHELFDOCKWIDGET_H
 
 #include <QDockWidget>
 
@@ -30,15 +31,16 @@ class BtBookshelfDockWidget: public QDockWidget {
     public:
         BtBookshelfDockWidget(QWidget *parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
 
-        static BtBookshelfDockWidget * getInstance() { return m_instance; }
+        static inline BtBookshelfDockWidget *getInstance() { return m_instance; }
 
-        BtBookshelfTreeModel::Grouping groupingOrder() const
-        { return m_treeModel->groupingOrder(); }
+        inline const BtBookshelfTreeModel::Grouping &groupingOrder() const {
+            return m_treeModel->groupingOrder();
+        }
 
         void loadBookshelfState();
         void saveBookshelfState();
 
-    Q_SIGNALS:
+    signals:
         void moduleHovered(CSwordModuleInfo *module);
         void moduleOpenTriggered(CSwordModuleInfo *module);
         void moduleSearchTriggered(CSwordModuleInfo *module);
@@ -49,6 +51,14 @@ class BtBookshelfDockWidget: public QDockWidget {
     protected:
         void initMenus();
         void retranslateUi();
+
+    protected slots:
+        void slotModuleActivated(CSwordModuleInfo *module);
+        void slotModuleChecked(CSwordModuleInfo *module, bool checked);
+        void slotItemActionTriggered(QAction *action);
+        void slotPrepareItemContextMenu();
+        void slotModulesChanged();
+        void slotGroupingOrderChanged(const BtBookshelfTreeModel::Grouping &g);
 
     protected:
         BtBookshelfTreeModel *m_treeModel;
@@ -61,6 +71,7 @@ class BtBookshelfDockWidget: public QDockWidget {
 
         // Item context menu:
         QMenu *m_itemContextMenu;
+        QActionGroup *m_itemActionGroup;
         QAction *m_itemOpenAction;
         QAction *m_itemSearchAction;
         QAction *m_itemUnlockAction;
@@ -68,3 +79,5 @@ class BtBookshelfDockWidget: public QDockWidget {
 
         static BtBookshelfDockWidget *m_instance;
 };
+
+#endif // BTBOOKSHELFDOCKWIDGET_H

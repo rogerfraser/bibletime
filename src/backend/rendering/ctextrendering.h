@@ -2,25 +2,25 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CTEXTRENDERING_H
+#define CTEXTRENDERING_H
 
-#include <list>
+#include <QList>
+#include <QSharedPointer>
 #include <QString>
-#include "../btglobal.h"
-#include "../config/btconfig.h"
+
 #include "../drivers/btmodulelist.h"
 
 
 class CSwordKey;
-class CSwordVerseKey;
 
 namespace Rendering {
 
@@ -29,6 +29,7 @@ namespace Rendering {
  * It provides several methods to convert an abstract tree of items
  * into a string of html.
  *
+ * See the implementations @ref CHTMLExportRendering and especially @ref CDisplayRendering.
  * @short Text rendering based on trees
  * @author The BibleTime team
 */
@@ -38,7 +39,15 @@ class CTextRendering {
 
         class KeyTreeItem;
 
-        using KeyTree = std::list<KeyTreeItem>;
+        class KeyTreeSharedPointer: public QSharedPointer<KeyTreeItem> {
+            public:
+                inline KeyTreeSharedPointer(KeyTreeItem * i)
+                    : QSharedPointer<KeyTreeItem>(i) {}
+
+                inline operator const KeyTreeItem * () const { return data(); }
+        };
+
+        using KeyTree = QList<KeyTreeSharedPointer>;
 
         class KeyTreeItem {
 
@@ -62,9 +71,6 @@ class CTextRendering {
 
             public: /* Methods: */
 
-                KeyTreeItem(KeyTreeItem &&) = delete;
-                KeyTreeItem(KeyTreeItem const &&) = delete;
-
                 KeyTreeItem(const QString &key,
                             const CSwordModuleInfo *module,
                             const Settings &settings);
@@ -80,28 +86,47 @@ class CTextRendering {
 
                 KeyTreeItem(const QString &content, const Settings &settings);
 
-                KeyTreeItem & operator=(KeyTreeItem &&) = delete;
-                KeyTreeItem & operator=(KeyTreeItem const &&) = delete;
+                KeyTreeItem(const KeyTreeItem &i);
 
-                QString const & getAlternativeContent() const
-                { return m_alternativeContent; }
+                inline const QString &getAlternativeContent() const {
+                    return m_alternativeContent;
+                }
 
-                bool hasAlternativeContent() const
-                { return !m_alternativeContent.isNull(); }
+                inline void setAlternativeContent(const QString& newContent) {
+                    m_alternativeContent = newContent;
+                }
 
-                BtConstModuleList const & modules() const
-                { return m_moduleList; }
+                inline bool hasAlternativeContent() const {
+                    return !m_alternativeContent.isNull();
+                }
 
-                QString const & key() const { return m_key; }
+                inline const BtConstModuleList& modules() const {
+                    return m_moduleList;
+                }
 
-                Settings const & settings() const { return m_settings; }
+                inline const QString& key() const {
+                    return m_key;
+                }
 
-                KeyTree & childList() const noexcept { return m_childList; }
+                inline const Settings& settings() const {
+                    return m_settings;
+                }
 
-                void setMappedKey(CSwordKey const * key) const
-                { m_mappedKey = key; }
+                inline KeyTree* childList() const {
+                    return &m_childList;
+                }
 
-                CSwordKey const * mappedKey() const { return m_mappedKey; }
+                inline void setMappedKey(CSwordKey const * key) const {
+                    m_mappedKey = key;
+                }
+
+                inline CSwordKey const * mappedKey() const {
+                    return m_mappedKey;
+                }
+
+            protected: /* Methods: */
+
+                KeyTreeItem();
 
             private: /* Fields: */
 
@@ -118,20 +143,13 @@ class CTextRendering {
 
     public: /* Methods: */
 
-        CTextRendering(
-            bool addText,
-            DisplayOptions const & displayOptions =
-                    btConfig().getDisplayOptions(),
-            FilterOptions const & filterOptions =
-                    btConfig().getFilterOptions());
-
         virtual ~CTextRendering() {}
 
         const QString renderKeyTree(const KeyTree &tree);
 
         const QString renderKeyRange(
-                CSwordVerseKey const & lowerBound,
-                CSwordVerseKey const & upperBound,
+                const QString &start,
+                const QString &stop,
                 const BtConstModuleList &modules,
                 const QString &hightlightKey = QString(),
                 const KeyTreeItem::Settings &settings = KeyTreeItem::Settings());
@@ -144,17 +162,12 @@ class CTextRendering {
     protected: /* Methods: */
 
         BtConstModuleList collectModules(const KeyTree &tree) const;
-        virtual QString renderEntry(const KeyTreeItem &item, CSwordKey * key = nullptr);
-        virtual QString finishText(const QString &text, const KeyTree &tree);
-        virtual QString entryLink(KeyTreeItem const & item,
-                                  CSwordModuleInfo const & module);
-
-    protected: /* Fields: */
-
-        DisplayOptions const m_displayOptions;
-        FilterOptions const m_filterOptions;
-        bool const m_addText;
+        virtual QString renderEntry(const KeyTreeItem &item, CSwordKey * key = nullptr) = 0;
+        virtual QString finishText(const QString &text, const KeyTree &tree) = 0;
+        virtual void initRendering() = 0;
 
 }; /* class CTextRendering */
 
 } /* namespace Rendering */
+
+#endif

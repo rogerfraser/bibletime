@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CMDIAREA_H
+#define CMDIAREA_H
 
 #include <QMdiArea>
 
@@ -72,8 +73,9 @@ class CMDIArea: public QMdiArea {
         /**
           Returns the current MDI arrangement mode.
         */
-        MDIArrangementMode getMDIArrangementMode() const
-        { return m_mdiArrangementMode; }
+        inline MDIArrangementMode getMDIArrangementMode() const {
+            return m_mdiArrangementMode;
+        }
 
         /**
         * Forces an update of the currently chosen window arrangement.
@@ -90,7 +92,7 @@ class CMDIArea: public QMdiArea {
         */
         void enableWindowMinMaxFlags(bool enable);
 
-    public Q_SLOTS:
+    public slots:
 
         /**
           Our own auto tile version which, if only one subwindow is left, shows it
@@ -133,7 +135,7 @@ class CMDIArea: public QMdiArea {
 
         void highlightTextInActiveWindow(const QString& text, bool caseSensitive);
 
-    Q_SIGNALS:
+    signals:
 
         /**
         * Emits a signal to set the caption of the toplevel widget.
@@ -162,7 +164,12 @@ class CMDIArea: public QMdiArea {
 
         void fixSystemMenu(QMdiSubWindow* subWindow);
 
-    protected Q_SLOTS:
+    protected slots:
+
+        /**
+          Called whan a subwindow was activated.
+        */
+        void slotSubWindowActivated(QMdiSubWindow *client);
 
         /**
           Called whan a tabbed subwindow is closed from the tab
@@ -179,3 +186,5 @@ class CMDIArea: public QMdiArea {
         BibleTime* m_bibleTime;
 
 }; /* class CMDIArea */
+
+#endif

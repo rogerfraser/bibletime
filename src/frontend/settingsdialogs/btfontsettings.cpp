@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -22,8 +22,6 @@
 #include <QVBoxLayout>
 #include <QWidget>
 #include "../../backend/config/btconfig.h"
-#include "../../backend/managers/cswordbackend.h"
-#include "../../util/btassert.h"
 #include "../../util/btconnect.h"
 #include "../../util/cresmgr.h"
 #include "../../util/tool.h"
@@ -38,8 +36,8 @@ BtFontSettingsPage::BtFontSettingsPage(CConfigurationDialog *parent)
     m_languageComboBox = new QComboBox(this);
     m_languageLabel->setBuddy(m_languageComboBox);
     m_languageCheckBox = new QCheckBox(this);
-    BT_CONNECT(m_languageCheckBox, &QCheckBox::toggled,
-               this, &BtFontSettingsPage::useOwnFontClicked);
+    BT_CONNECT(m_languageCheckBox, SIGNAL(toggled(bool)),
+               this,               SLOT(useOwnFontClicked(bool)) );
 
 
     QHBoxLayout *hLayout = new QHBoxLayout;
@@ -49,8 +47,8 @@ BtFontSettingsPage::BtFontSettingsPage(CConfigurationDialog *parent)
     hLayout->addWidget(m_languageCheckBox);
 
     struct Comp {
-        bool operator()(std::shared_ptr<Language const> const & lhs,
-                        std::shared_ptr<Language const> const & rhs) const
+        bool operator()(CLanguageMgr::Language const * lhs,
+                        CLanguageMgr::Language const * rhs) const
         {
             int cmp = lhs->translatedName().compare(rhs->translatedName());
             if (cmp == 0) {
@@ -60,16 +58,12 @@ BtFontSettingsPage::BtFontSettingsPage(CConfigurationDialog *parent)
             return cmp < 0;
         }
     };
-    std::set<std::shared_ptr<Language const>, Comp> languages;
-    {
-        auto const availableLanguages =
-                CSwordBackend::instance()->availableLanguages();
-        BT_ASSERT(availableLanguages);
-        for (auto const & language : *availableLanguages)
-            languages.emplace(language);
-    }
+    std::set<CLanguageMgr::Language const *, Comp> languages;
+    for (auto const * const language
+         : CLanguageMgr::instance()->availableLanguages().values())
+        languages.emplace(language);
 
-    for (auto const & l : languages) {
+    for (auto const * const l : languages) {
         m_workSettings.emplace_back(
                     WorkSetting{*l, btConfig().getFontForLanguage(*l)});
         auto const & k = l->translatedName().isEmpty()
@@ -100,7 +94,7 @@ BtFontSettingsPage::BtFontSettingsPage(CConfigurationDialog *parent)
                    work.settings.second = newFont;
                });
     BT_CONNECT(m_languageComboBox,
-               qOverload<int>(&QComboBox::currentIndexChanged),
+               QOverload<int>::of(&QComboBox::currentIndexChanged),
                [this](int const newIndex) {
                    auto const i = static_cast<std::size_t>(newIndex);
                    auto const & p = m_workSettings[i].settings;

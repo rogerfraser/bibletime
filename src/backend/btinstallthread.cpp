@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -21,11 +21,7 @@
 #include "managers/cswordbackend.h"
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <filemgr.h>
-#pragma GCC diagnostic pop
 
 
 namespace {
@@ -65,13 +61,14 @@ void BtInstallThread::run() {
 }
 
 void BtInstallThread::installModule() {
-    Q_EMIT preparingInstall(m_currentModuleIndex);
+    emit preparingInstall(m_currentModuleIndex);
 
     const CSwordModuleInfo * const module = m_modules.at(m_currentModuleIndex);
 
     QVariant vModuleName = module->property("installSourceName");
     QString moduleName = vModuleName.toString();
     sword::InstallSource installSource = BtInstallBackend::source(moduleName);
+    std::unique_ptr<CSwordBackend> backendForSource(BtInstallBackend::backend(installSource));
 
     // Check whether it's an update. If yes, remove existing module first:
     /// \todo silently removing without undo if the user cancels the update is WRONG!!!
@@ -86,43 +83,39 @@ void BtInstallThread::installModule() {
                                           module->name().toLatin1(),
                                           &installSource);
         if (status == 0) {
-            Q_EMIT statusUpdated(m_currentModuleIndex, 100);
+            emit statusUpdated(m_currentModuleIndex, 100);
         } else {
             qWarning() << "Error with install: " << status
                        << "module:" << module->name();
         }
-        Q_EMIT installCompleted(m_currentModuleIndex, status == 0);
+        emit installCompleted(m_currentModuleIndex, status == 0);
     } else { // Local source
         int status = m_iMgr.installModule(&lMgr,
                                           installSource.directory.c_str(),
                                           module->name().toLatin1());
         if (status == 0) {
-            Q_EMIT statusUpdated(m_currentModuleIndex, 100);
+            emit statusUpdated(m_currentModuleIndex, 100);
         } else if (status != -1) {
             qWarning() << "Error with install: " << status
                        << "module:" << module->name();
         }
-        Q_EMIT installCompleted(m_currentModuleIndex, status == 0);
+        emit installCompleted(m_currentModuleIndex, status == 0);
     }
 }
 
 void BtInstallThread::slotManagerStatusUpdated(int totalProgress, int /*fileProgress*/) {
-    Q_EMIT statusUpdated(m_currentModuleIndex, totalProgress);
+    emit statusUpdated(m_currentModuleIndex, totalProgress);
 }
 
 void BtInstallThread::slotDownloadStarted() {
-    Q_EMIT downloadStarted(m_currentModuleIndex);
+    emit downloadStarted(m_currentModuleIndex);
 }
 
 bool BtInstallThread::removeModule() {
     CSwordModuleInfo * const installedModule = m_modules.at(m_currentModuleIndex);
     CSwordModuleInfo * m = CSwordBackend::instance()->findModuleByName(installedModule->name());
-    std::unique_ptr<CSwordBackend const> backend;
-    if (!m) {
-        backend = BtInstallBackend::backend(
-                      BtInstallBackend::source(m_destination.toLatin1()));
-        m = backend->findModuleByName(installedModule->name());
-    }
+    if (!m)
+        m = BtInstallBackend::backend(BtInstallBackend::source(m_destination.toLatin1()))->findModuleByName(installedModule->name());
 
     if (!m)
         return false;
@@ -130,19 +123,16 @@ bool BtInstallThread::removeModule() {
     qDebug() << "Removing module" << installedModule->name();
     QString prefixPath = m->config(CSwordModuleInfo::AbsoluteDataPath) + "/";
     QString dataPath = m->config(CSwordModuleInfo::DataPath);
-    auto const moduleName(m->name());
-    backend.reset();
-
     if (dataPath.left(2) == "./")
         dataPath = dataPath.mid(2);
 
     if (prefixPath.contains(dataPath)) {
         prefixPath.remove(prefixPath.indexOf(dataPath), dataPath.length());
     } else {
-        prefixPath = CSwordBackend::instance()->prefixPath();
+        prefixPath = QString::fromLatin1(CSwordBackend::instance()->prefixPath);
     }
 
     sword::SWMgr mgr(prefixPath.toLatin1());
-    BtInstallMgr().removeModule(&mgr, moduleName.toLatin1());
+    BtInstallMgr().removeModule(&mgr, m->name().toLatin1());
     return true;
 }

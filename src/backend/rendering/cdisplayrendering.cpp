@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -26,25 +26,25 @@ namespace Rendering {
 
 CDisplayRendering::CDisplayRendering(const DisplayOptions &displayOptions,
                                      const FilterOptions &filterOptions)
-        : CTextRendering(true, displayOptions, filterOptions)
+        : CHTMLExportRendering(true, displayOptions, filterOptions)
 {
     // Intentionally empty
 }
 
-QString CDisplayRendering::entryLink(KeyTreeItem const & item,
-                                     CSwordModuleInfo const & module)
+QString CDisplayRendering::entryLink(const KeyTreeItem &item,
+                                     const CSwordModuleInfo * module)
 {
     QString linkText;
 
-    const bool isBible = module.type() == CSwordModuleInfo::Bible;
-    CSwordVerseKey vk(&module); // only valid for bible modules, i.e. isBible == true
+    const bool isBible = module && (module->type() == CSwordModuleInfo::Bible);
+    CSwordVerseKey vk(module); //only valid for bible modules, i.e. isBible == true
     vk.setIntros(true);
 
     if (isBible) {
         vk.setKey(item.mappedKey() ? item.mappedKey()->key() : item.key());
     }
 
-    if (isBible && (vk.verse() == 0)) {
+    if (isBible && (vk.getVerse() == 0)) {
         return QString(); //Warning: return already here
     }
 
@@ -56,21 +56,21 @@ QString CDisplayRendering::entryLink(KeyTreeItem const & item,
 
     case KeyTreeItem::Settings::ExpandedShort:
         if (isBible) {
-            linkText = module.name() + ':' + vk.shortText();
+            linkText = module->name() + ':' + QString::fromUtf8(vk.getShortText());
             break;
         }
         Q_FALLTHROUGH();
 
     case KeyTreeItem::Settings::CompleteShort:
         if (isBible) {
-            linkText = vk.shortText();
+            linkText = QString::fromUtf8(vk.getShortText());
             break;
         }
         Q_FALLTHROUGH();
 
     case KeyTreeItem::Settings::ExpandedLong:
         if (isBible) {
-            linkText = QString("%1 (%2)").arg(vk.key()).arg(module.name());
+            linkText = QString("%1 (%2)").arg(vk.key()).arg(module->name());
             break;
         }
         Q_FALLTHROUGH();
@@ -88,29 +88,29 @@ QString CDisplayRendering::entryLink(KeyTreeItem const & item,
                 CSwordVerseKey baseKey(*item.modules().begin());
                 baseKey.setKey(item.key());
 
-                if (vk.bookName() != baseKey.bookName()) {
-                    linkText = vk.shortText();
-                } else if (vk.chapter() != baseKey.chapter()) {
-                    linkText = QString("%1:%2").arg(vk.chapter()).arg(vk.verse());
+                if (vk.book() != baseKey.book()) {
+                    linkText = QString::fromUtf8(vk.getShortText());
+                } else if (vk.getChapter() != baseKey.getChapter()) {
+                    linkText = QString("%1:%2").arg(vk.getChapter()).arg(vk.getVerse());
                 } else {
-                    linkText = QString::number(vk.verse());
+                    linkText = QString::number(vk.getVerse());
                 }
 
                 if(vk.isBoundSet()) {
                     linkText += "-";
-                    auto const upper = vk.upperBound();
-                    auto const lower = vk.lowerBound();
-                    if (upper.book() != lower.book()) {
-                        linkText += upper.shortText();
-                    } else if(upper.chapter() != lower.chapter()) {
-                        linkText += QString("%1:%2").arg(upper.chapter())
-                                                    .arg(lower.verse());
+                    sword::VerseKey const upper = vk.getUpperBound();
+                    sword::VerseKey const lower = vk.getLowerBound();
+                    if (upper.getBook() != lower.getBook()) {
+                        linkText += QString::fromUtf8(upper.getShortText());
+                    } else if(upper.getChapter() != lower.getChapter()) {
+                        linkText += QString("%1:%2").arg(upper.getChapter())
+                                                    .arg(lower.getVerse());
                     } else {
-                        linkText += QString::number(upper.verse());
+                        linkText += QString::number(upper.getVerse());
                     }
                 }
             } else {
-                linkText = QString::number(vk.verse());
+                linkText = QString::number(vk.getVerse());
             }
             break;
         } // else fall through for non-Bible modules
@@ -129,7 +129,9 @@ QString CDisplayRendering::entryLink(KeyTreeItem const & item,
     else {
         return QString("<a name=\"").append(keyToHTMLAnchor(item.key())).append("\" ")
                .append("href=\"")
-               .append(ReferenceManager::encodeHyperlink(module, item.key()))
+               .append(ReferenceManager::encodeHyperlink(
+                           module->name(), item.key(), ReferenceManager::typeFromModule(module->type()))
+                      )
                .append("\">").append(linkText).append("</a>\n");
     }
 }
@@ -178,10 +180,13 @@ QString CDisplayRendering::finishText(const QString &text, const KeyTree &tree) 
 
     CDisplayTemplateMgr::Settings settings;
     settings.modules = modules;
-    if (modules.count() == 1)
-        if (auto const lang = modules.first()->language())
-            if (auto const & abbrev = lang->abbrev(); !abbrev.isEmpty())
+    if (modules.count() == 1) {
+        if (auto * const lang = modules.first()->language()) {
+            auto const & abbrev = lang->abbrev();
+            if (!abbrev.isEmpty())
                 settings.langAbbrev = abbrev;
+        }
+    }
 
     if (modules.count() == 1)
         settings.textDirection = modules.first()->textDirection();

@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -19,6 +19,7 @@
 #include <QDesktopServices>
 #include <QInputDialog>
 #include <QList>
+#include <QLocale>
 #include <QMdiSubWindow>
 #include <QMenu>
 #include <QProcess>
@@ -35,7 +36,7 @@
 #include "cmdiarea.h"
 #include "bookshelfwizard/btbookshelfwizard.h"
 #include "display/btfindwidget.h"
-#include "display/btmodelviewreaddisplay.h"
+#include "display/cdisplay.h"
 #include "displaywindow/btmodulechooserbar.h"
 #include "displaywindow/cdisplaywindow.h"
 #include "messagedialog.h"
@@ -47,36 +48,49 @@
 /** Opens the optionsdialog of BibleTime. */
 void BibleTime::slotSettingsOptions() {
     qDebug() << "BibleTime::slotSettingsOptions";
-    CConfigurationDialog *dlg = new CConfigurationDialog(this);
-    BT_CONNECT(dlg,  &BtConfigDialog::signalSettingsChanged,
-               [this]{
-                   qDebug() << "BibleTime::slotSettingsChanged";
-                   CSwordBackend::instance()->setBooknameLanguage(
-                               btConfig().booknameLanguage());
-
-                   /** \todo update the bookmarks after Bible bookname language
-                             has been changed. */
-                   /* for (QTreeWidgetItemIterator it = m_mainIndex; *it; ++it)
-                       if (auto * citem = dynamic_cast<CIndexItemBase*>(*it))
-                           citem->update(); */
-
-                   m_actionCollection->readShortcuts("Application shortcuts");
-                   refreshDisplayWindows();
-                   refreshProfileMenus();
-                   m_infoDisplay->updateColors();
-                   qDebug() << "BibleTime::slotSettingsChanged";
-               });
+    CConfigurationDialog *dlg = new CConfigurationDialog(this, m_actionCollection);
+    BT_CONNECT(dlg,  SIGNAL(signalSettingsChanged()),
+               this, SLOT(slotSettingsChanged()) );
 
     dlg->show();
 }
 
 /** Save the settings, used when no settings have been saved before **/
-void BibleTime::saveConfigSettings()
-{ CConfigurationDialog(this).save(); }
+void BibleTime::saveConfigSettings() {
+    CConfigurationDialog* dlg = new CConfigurationDialog(this, nullptr);
+    dlg->save();
+    delete dlg;
+}
+
+/** Is called when settings in the optionsdialog were changed (ok or apply) */
+void BibleTime::slotSettingsChanged() {
+    qDebug() << "BibleTime::slotSettingsChanged";
+    const QString language = btConfig().value<QString>("GUI/booknameLanguage",
+                                                       QLocale().name());
+    CSwordBackend::instance()->booknameLanguage(language);
+
+// \todo update the bookmarks after Bible bookname language has been changed
+//     QTreeWidgetItemIterator it(m_mainIndex);
+//     while (*it) {
+//         CIndexItemBase* citem = dynamic_cast<CIndexItemBase*>(*it);
+//         if (citem) {
+//             citem->update();
+//         }
+//         ++it;
+//     }
+
+    m_actionCollection->readShortcuts("Application shortcuts");
+    refreshDisplayWindows();
+    refreshProfileMenus();
+    m_infoDisplay->updateColors();
+    qDebug() << "BibleTime::slotSettingsChanged";
+}
 
 /** Opens the bookshelf wizard. */
-void BibleTime::slotBookshelfWizard()
-{ BtBookshelfWizard(BibleTime::instance()).exec(); }
+void BibleTime::slotBookshelfWizard() {
+    BtBookshelfWizard dlg(BibleTime::instance());
+    dlg.exec();
+}
 
 /** Is called just before the window menu is shown. */
 void BibleTime::slotWindowMenuAboutToShow() {
@@ -99,7 +113,7 @@ void BibleTime::slotOpenWindowsMenuAboutToShow() {
     BT_ASSERT(m_openWindowsMenu);
 
     m_openWindowsMenu->clear();
-    for (auto * const window : m_mdi->usableWindowList()) {
+    Q_FOREACH (QMdiSubWindow * const window, m_mdi->usableWindowList()) {
         QAction *openWindowAction = m_openWindowsMenu->addAction(window->windowTitle());
         openWindowAction->setCheckable(true);
         openWindowAction->setChecked(window == m_mdi->activeSubWindow());
@@ -112,26 +126,25 @@ void BibleTime::slotOpenWindowsMenuAboutToShow() {
 void BibleTime::slotUpdateWindowArrangementActions(QAction * trigerredAction) {
     BT_ASSERT(trigerredAction);
 
-    auto guiConfig = btConfig().session().group("GUI");
     if (trigerredAction == m_windowAutoTileVerticalAction) {
         m_mdi->setMDIArrangementMode(CMDIArea::ArrangementModeTileVertical);
-        guiConfig.setValue("alignmentMode", autoTileVertical);
+        btConfig().setSessionValue("GUI/alignmentMode", autoTileVertical);
     }
     else if (trigerredAction == m_windowAutoTileHorizontalAction) {
         m_mdi->setMDIArrangementMode(CMDIArea::ArrangementModeTileHorizontal);
-        guiConfig.setValue("alignmentMode", autoTileHorizontal);
+        btConfig().setSessionValue("GUI/alignmentMode", autoTileHorizontal);
     }
     else if (trigerredAction == m_windowAutoTileAction) {
         m_mdi->setMDIArrangementMode(CMDIArea::ArrangementModeTile);
-        guiConfig.setValue("alignmentMode", autoTile);
+        btConfig().setSessionValue("GUI/alignmentMode", autoTile);
     }
     else if (trigerredAction == m_windowAutoTabbedAction) {
         m_mdi->setMDIArrangementMode(CMDIArea::ArrangementModeTabbed);
-        guiConfig.setValue("alignmentMode", autoTabbed);
+        btConfig().setSessionValue("GUI/alignmentMode", autoTabbed);
     }
     else if (trigerredAction == m_windowAutoCascadeAction) {
         m_mdi->setMDIArrangementMode(CMDIArea::ArrangementModeCascade);
-        guiConfig.setValue("alignmentMode", autoCascade);
+        btConfig().setSessionValue("GUI/alignmentMode", autoCascade);
     }
     else {
         BT_ASSERT(trigerredAction == m_windowManualModeAction
@@ -145,7 +158,7 @@ void BibleTime::slotUpdateWindowArrangementActions(QAction * trigerredAction) {
 
         m_mdi->enableWindowMinMaxFlags(true);
         m_mdi->setMDIArrangementMode(CMDIArea::ArrangementModeManual);
-        guiConfig.setValue("alignmentMode", manual);
+        btConfig().setSessionValue("GUI/alignmentMode", manual);
 
         if (trigerredAction == m_windowTileAction)
             m_mdi->myTile();
@@ -181,9 +194,8 @@ void BibleTime::slotTileHorizontal() {
 /** Shows/hides the toolbar */
 void BibleTime::slotToggleMainToolbar() {
     BT_ASSERT(m_mainToolBar);
-    auto guiConf = btConfig().session().group("GUI");
-    bool const currentState = guiConf.value<bool>("showMainToolbar", true);
-    guiConf.setValue("showMainToolbar", !currentState);
+    bool currentState = btConfig().sessionValue<bool>("GUI/showMainToolbar", true);
+    btConfig().setSessionValue("GUI/showMainToolbar", !currentState);
     if ( m_showMainWindowToolbarAction->isChecked()) {
         m_mainToolBar->show();
     }
@@ -193,75 +205,64 @@ void BibleTime::slotToggleMainToolbar() {
 }
 
 void BibleTime::slotToggleTextWindowHeader() {
-    auto guiConfig = btConfig().session().group("GUI");
-    bool const currentState =
-            guiConfig.value<bool>("showTextWindowHeaders", true);
-    guiConfig.setValue("showTextWindowHeaders", !currentState);
-    Q_EMIT toggledTextWindowHeader(!currentState);
+    bool currentState = btConfig().sessionValue<bool>("GUI/showTextWindowHeaders", true);
+    btConfig().setSessionValue("GUI/showTextWindowHeaders", !currentState);
+    emit toggledTextWindowHeader(!currentState);
 }
 
 void BibleTime::slotToggleNavigatorToolbar() {
-    auto guiConfig = btConfig().session().group("GUI");
-    bool const currentState =
-            guiConfig.value<bool>("showTextWindowNavigator", true);
-    guiConfig.setValue("showTextWindowNavigator", !currentState);
-    if (guiConfig.value<bool>("showToolbarsInEachWindow", true))
-        Q_EMIT toggledTextWindowNavigator(!currentState);
+    bool currentState = btConfig().sessionValue<bool>("GUI/showTextWindowNavigator", true);
+    btConfig().setSessionValue("GUI/showTextWindowNavigator", !currentState);
+    if (btConfig().sessionValue<bool>("GUI/showToolbarsInEachWindow", true))
+        emit toggledTextWindowNavigator(!currentState);
     else
-        m_navToolBar->setVisible(guiConfig.value<bool>("showTextWindowNavigator", true));
+        m_navToolBar->setVisible(btConfig().sessionValue<bool>("GUI/showTextWindowNavigator", true));
 }
 
 void BibleTime::slotToggleToolsToolbar() {
-    auto guiConfig = btConfig().session().group("GUI");
-    bool const currentState =
-            guiConfig.value<bool>("showTextWindowToolButtons", true);
-    guiConfig.setValue("showTextWindowToolButtons", !currentState);
-    if (guiConfig.value<bool>("showToolbarsInEachWindow", true))
-        Q_EMIT toggledTextWindowToolButtons(!currentState);
+    bool currentState = btConfig().sessionValue<bool>("GUI/showTextWindowToolButtons", true);
+    btConfig().setSessionValue("GUI/showTextWindowToolButtons", !currentState);
+    if (btConfig().sessionValue<bool>("GUI/showToolbarsInEachWindow", true))
+        emit toggledTextWindowToolButtons(!currentState);
     else
-        m_toolsToolBar->setVisible(guiConfig.value<bool>("showTextWindowToolButtons", true));
+        m_toolsToolBar->setVisible(btConfig().sessionValue<bool>("GUI/showTextWindowToolButtons", true));
 }
 
 void BibleTime::slotToggleWorksToolbar() {
-    auto guiConfig = btConfig().session().group("GUI");
-    bool const currentState =
-            guiConfig.value<bool>("showTextWindowModuleSelectorButtons", true);
-    guiConfig.setValue("showTextWindowModuleSelectorButtons", !currentState);
-    if (guiConfig.value<bool>("showToolbarsInEachWindow", true))
-        Q_EMIT toggledTextWindowModuleChooser(!currentState);
+    bool currentState = btConfig().sessionValue<bool>("GUI/showTextWindowModuleSelectorButtons", true);
+    btConfig().setSessionValue("GUI/showTextWindowModuleSelectorButtons", !currentState);
+    if (btConfig().sessionValue<bool>("GUI/showToolbarsInEachWindow", true))
+        emit toggledTextWindowModuleChooser(!currentState);
     else
-        m_worksToolBar->setVisible(guiConfig.value<bool>("showTextWindowModuleSelectorButtons", true));
+        m_worksToolBar->setVisible(btConfig().sessionValue<bool>("GUI/showTextWindowModuleSelectorButtons", true));
 }
 
 void BibleTime::slotToggleToolBarsInEachWindow() {
-    auto guiConfig = btConfig().session().group("GUI");
-    bool const currentState =
-            guiConfig.value<bool>("showToolbarsInEachWindow", true);
-    guiConfig.setValue("showToolbarsInEachWindow", !currentState);
+    bool currentState = btConfig().sessionValue<bool>("GUI/showToolbarsInEachWindow", true);
+    btConfig().setSessionValue("GUI/showToolbarsInEachWindow", !currentState);
     showOrHideToolBars();
 }
 
 void BibleTime::showOrHideToolBars() {
-    auto const guiConfig = btConfig().session().group("GUI");
-    if (guiConfig.value<bool>("showToolbarsInEachWindow", true)) {
+    if (btConfig().sessionValue<bool>("GUI/showToolbarsInEachWindow", true)) {
         // set main window widgets invisible
         m_navToolBar->setVisible(false);
         m_worksToolBar->setVisible(false);
         m_toolsToolBar->setVisible(false);
         // set state of sub window widets
-        Q_EMIT toggledTextWindowNavigator(guiConfig.value<bool>("showTextWindowNavigator", true));
-        Q_EMIT toggledTextWindowModuleChooser(guiConfig.value<bool>("showTextWindowModuleSelectorButtons", true));
-        Q_EMIT toggledTextWindowToolButtons(guiConfig.value<bool>("showTextWindowToolButtons", true));
+        emit toggledTextWindowNavigator(btConfig().sessionValue<bool>("GUI/showTextWindowNavigator", true));
+        emit toggledTextWindowModuleChooser(btConfig().sessionValue<bool>("GUI/showTextWindowModuleSelectorButtons", true));
+        emit toggledTextWindowToolButtons(btConfig().sessionValue<bool>("GUI/showTextWindowToolButtons", true));
     }
     else {
         // set state of main window widgets
-        m_navToolBar->setVisible(guiConfig.value<bool>("showTextWindowNavigator", true));
-        m_worksToolBar->setVisible(guiConfig.value<bool>("showTextWindowModuleSelectorButtons", true));
-        m_toolsToolBar->setVisible(guiConfig.value<bool>("showTextWindowToolButtons", true));
+        m_navToolBar->setVisible(btConfig().sessionValue<bool>("GUI/showTextWindowNavigator", true));
+        m_worksToolBar->setVisible(btConfig().sessionValue<bool>("GUI/showTextWindowModuleSelectorButtons", true));
+        m_toolsToolBar->setVisible(btConfig().sessionValue<bool>("GUI/showTextWindowToolButtons", true));
         //set sub window widgets invisible
-        Q_EMIT toggledTextWindowNavigator(false);
-        Q_EMIT toggledTextWindowToolButtons(false);
-        Q_EMIT toggledTextWindowModuleChooser(false);
+        emit toggledTextWindowNavigator(false);
+        emit toggledTextWindowToolButtons(false);
+        emit toggledTextWindowModuleChooser(false);
     }
 }
 
@@ -276,7 +277,7 @@ void BibleTime::slotSearchModules() {
     //get the modules of the open windows
     BtConstModuleList modules;
 
-    for (auto const * const subWindow : m_mdi->subWindowList()) {
+    Q_FOREACH (const QMdiSubWindow * const subWindow, m_mdi->subWindowList()) {
         const CDisplayWindow * const w = dynamic_cast<CDisplayWindow*>(subWindow->widget());
         if (w != nullptr) {
             modules << w->modules();
@@ -348,25 +349,27 @@ void BibleTime::slotOpenTipDialog() {
 
 void BibleTime::saveProfile() {
     // Save main window settings:
-    auto conf = btConfig().session();
-    conf.setValue("MainWindow/geometry", saveGeometry());
-    conf.setValue("MainWindow/state", saveState());
-    conf.setValue("MainWindow/MDIArrangementMode", static_cast<int>(m_mdi->getMDIArrangementMode()));
+    BtConfig & conf = btConfig();
+    conf.setSessionValue("MainWindow/geometry", saveGeometry());
+    conf.setSessionValue("MainWindow/state", saveState());
+    conf.setSessionValue("MainWindow/MDIArrangementMode", static_cast<int>(m_mdi->getMDIArrangementMode()));
 
-    conf.setValue("FindIsVisible", m_findWidget->isVisibleTo(this));
+    conf.setSessionValue("FindIsVisible", m_findWidget->isVisibleTo(this));
 
     QStringList windowsList;
-    for (auto const * const w : m_mdi->subWindowList(QMdiArea::StackingOrder)) {
+    Q_FOREACH (const QMdiSubWindow * const w,
+               m_mdi->subWindowList(QMdiArea::StackingOrder))
+    {
         CDisplayWindow * const displayWindow = dynamic_cast<CDisplayWindow*>(w->widget());
         if (!displayWindow)
             continue;
 
         const QString windowKey = QString::number(windowsList.size());
         windowsList.append(windowKey);
-        auto windowConf = conf.group("window/" + windowKey);
-        displayWindow->storeProfileSettings(windowConf);
+        const QString windowGroup = "window/" + windowKey + '/';
+        displayWindow->storeProfileSettings(windowGroup);
     }
-    conf.setValue("windowsList", windowsList);
+    conf.setSessionValue("windowsList", windowsList);
 }
 
 void BibleTime::loadProfile(QAction * action) {
@@ -378,11 +381,10 @@ void BibleTime::loadProfile(QAction * action) {
 }
 
 void BibleTime::loadProfile(const QString & profileKey) {
-    auto & conf = btConfig();
-    BT_ASSERT(conf.sessionNames().contains(profileKey));
+    BT_ASSERT(btConfig().sessionNames().contains(profileKey));
 
     // do nothing if requested session is the current session
-    if (profileKey == conf.currentSessionKey())
+    if (profileKey == btConfig().currentSessionKey())
         return;
 
     // Save old profile:
@@ -392,14 +394,29 @@ void BibleTime::loadProfile(const QString & profileKey) {
     m_mdi->closeAllSubWindows();
 
     // Switch profile Activate profile:
-    conf.setCurrentSession(profileKey);
+    btConfig().setCurrentSession(profileKey);
     reloadProfile();
     refreshProfileMenus();
 }
 
+namespace {
+
+/// Helper object for reloadProfile()
+struct WindowLoadStatus {
+    inline WindowLoadStatus() : window(nullptr) {}
+    QStringList failedModules;
+    QList<CSwordModuleInfo*> okModules;
+    CDisplayWindow * window;
+};
+
+} // anonymous namespace
+
 void BibleTime::reloadProfile() {
     using MAM = CMDIArea::MDIArrangementMode;
     using message::setQActionCheckedNoTrigger;
+
+    // Cache pointer to config:
+    BtConfig & conf = btConfig();
 
     // Disable updates while doing big changes:
     setUpdatesEnabled(false);
@@ -408,47 +425,38 @@ void BibleTime::reloadProfile() {
     m_mdi->closeAllSubWindows();
 
     // Reload main window settings:
-    auto const sessionConf = btConfig().session();
-    auto const mwConf = sessionConf.group("MainWindow");
-    restoreGeometry(mwConf.value<QByteArray>("geometry"));
-    restoreState(mwConf.value<QByteArray>("state"));
+    restoreGeometry(conf.sessionValue<QByteArray>("MainWindow/geometry"));
+    restoreState(conf.sessionValue<QByteArray>("MainWindow/state"));
 
     /*
      * restoreState includes visibility of child widgets, the manually added
      * qactions (so not including bookmark, bookshelf and mag) are not restored
      * though, so we restore their state here.
      */
-    auto const guiConf = sessionConf.group("GUI");
     setQActionCheckedNoTrigger(m_windowFullscreenAction, isFullScreen());
-    setQActionCheckedNoTrigger(m_showTextAreaHeadersAction, guiConf.value<bool>("showTextWindowHeaders", true));
-    setQActionCheckedNoTrigger(m_showMainWindowToolbarAction, guiConf.value<bool>("showMainToolbar", true));
-    setQActionCheckedNoTrigger(m_showTextWindowNavigationAction, guiConf.value<bool>("showTextWindowNavigator", true));
-    setQActionCheckedNoTrigger(m_showTextWindowModuleChooserAction, guiConf.value<bool>("showTextWindowModuleSelectorButtons", true));
-    setQActionCheckedNoTrigger(m_showTextWindowToolButtonsAction, guiConf.value<bool>("showTextWindowToolButtons", true));
-    setQActionCheckedNoTrigger(m_toolbarsInEachWindow, guiConf.value<bool>("showToolbarsInEachWindow", true));
+    setQActionCheckedNoTrigger(m_showTextAreaHeadersAction, conf.sessionValue<bool>("GUI/showTextWindowHeaders", true));
+    setQActionCheckedNoTrigger(m_showMainWindowToolbarAction, conf.sessionValue<bool>("GUI/showMainToolbar", true));
+    setQActionCheckedNoTrigger(m_showTextWindowNavigationAction, conf.sessionValue<bool>("GUI/showTextWindowNavigator", true));
+    setQActionCheckedNoTrigger(m_showTextWindowModuleChooserAction, conf.sessionValue<bool>("GUI/showTextWindowModuleSelectorButtons", true));
+    setQActionCheckedNoTrigger(m_showTextWindowToolButtonsAction, conf.sessionValue<bool>("GUI/showTextWindowToolButtons", true));
+    setQActionCheckedNoTrigger(m_toolbarsInEachWindow, conf.sessionValue<bool>("GUI/showToolbarsInEachWindow", true));
 
-    m_mdi->setMDIArrangementMode(
-                static_cast<MAM>(
-                    mwConf.value<int>("MDIArrangementMode",
-                                      CMDIArea::ArrangementModeTile)));
+    m_mdi->setMDIArrangementMode(static_cast<MAM>(
+                                     conf.sessionValue<int>("MainWindow/MDIArrangementMode",CMDIArea::ArrangementModeTile)));
 
-    m_findWidget->setVisible(sessionConf.value<bool>("FindIsVisible", false));
+    m_findWidget->setVisible(conf.sessionValue<bool>("FindIsVisible", false));
 
     QWidget * focusWindow = nullptr;
-    struct WindowLoadStatus {
-        QStringList failedModules;
-        QList<CSwordModuleInfo *> okModules;
-        CDisplayWindow * window = nullptr;
-    };
     QMap<QString, WindowLoadStatus> failedWindows;
-    for (auto const & w : sessionConf.value<QStringList>("windowsList")) {
-        BT_ASSERT(!w.endsWith('/'));
-        auto const windowConf = sessionConf.group("window/" + w);
+    Q_FOREACH (const QString & w,
+               conf.sessionValue<QStringList>("windowsList"))
+    {
+        const QString windowGroup = "window/" + w + '/';
 
         // Try to determine window modules:
         WindowLoadStatus wls;
-        for (auto const & moduleName
-             : windowConf.value<QStringList>("modules"))
+        Q_FOREACH (const QString &moduleName,
+                   conf.sessionValue<QStringList>(windowGroup + "modules"))
         {
             CSwordModuleInfo * const m = CSwordBackend::instance()->findModuleByName(moduleName);
             if (m) {
@@ -470,12 +478,12 @@ void BibleTime::reloadProfile() {
 
         // Try to respawn the window:
         BT_ASSERT(!wls.window);
-        auto const key = windowConf.value<QString>("key");
+        const QString key = conf.sessionValue<QString>(windowGroup + "key");
         wls.window = createReadDisplayWindow(wls.okModules, key);
 
         if (wls.window) {
-            wls.window->applyProfileSettings(windowConf);
-            if (windowConf.value<bool>("hasFocus", false))
+            wls.window->applyProfileSettings(windowGroup);
+            if (conf.sessionValue<bool>(windowGroup + "hasFocus", false))
                 focusWindow = wls.window;
         } else {
             failedWindows.insert(w, wls);
@@ -528,6 +536,7 @@ void BibleTime::autoScrollUp() {
         setAutoScrollTimerInterval();
     } else {
         m_autoScroll.enabled = true;
+        autoScrollEnablePauseAction(true);
         m_autoScroll.speed = 1;
         m_autoScroll.paused = false;
         setAutoScrollTimerInterval();
@@ -545,6 +554,7 @@ void BibleTime::autoScrollDown() {
         setAutoScrollTimerInterval();
     } else {
         m_autoScroll.enabled = true;
+        autoScrollEnablePauseAction(true);
         m_autoScroll.speed = -1;
         m_autoScroll.paused = false;
         setAutoScrollTimerInterval();
@@ -571,6 +581,12 @@ bool BibleTime::autoScrollAnyKey(int /* key */) {
 void BibleTime::autoScrollStop() {
     m_autoScrollTimer.stop();
     m_autoScroll.enabled = false;
+    autoScrollEnablePauseAction(false);
+}
+
+void BibleTime::autoScrollEnablePauseAction(bool enable) {
+    m_autoScrollPauseAction = &m_actionCollection->action("autoScrollPause");
+    m_autoScrollPauseAction->setEnabled(enable);
 }
 
 void BibleTime::slotAutoScroll() {
@@ -578,7 +594,7 @@ void BibleTime::slotAutoScroll() {
         m_autoScrollTimer.stop();
         return;
     }
-    auto * display = getCurrentDisplay();
+    CDisplay * display = getCurrentDisplay();
     if (display) {
         display->scroll(m_autoScroll.speed >0 ? -1 : 1 );
         display->updateReferenceText();
@@ -626,11 +642,14 @@ void BibleTime::saveToNewProfile() {
 
 /** Slot to refresh the saved profile and load profile menus. */
 void BibleTime::refreshProfileMenus() {
+    using SNHM = BtConfig::SessionNamesHashMap;
+    using SNHMCI = SNHM::const_iterator;
+
     m_windowLoadProfileMenu->clear();
     m_windowDeleteProfileMenu->clear();
 
     BtConfig & conf = btConfig();
-    auto const & sessions = conf.sessionNames();
+    const BtConfig::SessionNamesHashMap &sessions = conf.sessionNames();
 
     const bool enableActions = sessions.size() > 1;
     m_windowLoadProfileMenu->setEnabled(enableActions);
@@ -638,7 +657,7 @@ void BibleTime::refreshProfileMenus() {
 
 
     if (enableActions) {
-        for (auto it = sessions.constBegin(); it != sessions.constEnd(); ++it) {
+        for (SNHMCI it = sessions.constBegin(); it != sessions.constEnd(); ++it) {
             QAction * a;
 
             a = m_windowLoadProfileMenu->addAction(it.value());

@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CRESMGR_H
+#define CRESMGR_H
 
 #include <QKeySequence>
 #include <QString>
@@ -326,6 +327,10 @@ extern const QKeySequence accel;
 namespace previousEntry {
 extern const QKeySequence accel;
 }
+namespace lyxMenu { BT_GETICON(edit_lyx) }
+namespace copyMenu { BT_GETICON(edit_copy) }
+namespace saveMenu { BT_GETICON(file_save) }
+namespace printMenu { BT_GETICON(print) }
 }
 
 namespace writeWindow {
@@ -450,3 +455,5 @@ BT_GETICON2(icon_remove, remove)
 
 #undef BT_GETICON
 #undef BT_GETICON2
+
+#endif

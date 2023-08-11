@@ -2,7 +2,7 @@
 # Find packages:
 #
 FIND_PACKAGE(CLucene REQUIRED)
-SET(REQUIRED_QT_VERSION 5.12)
+SET(REQUIRED_QT_VERSION 5.9)
 FIND_PACKAGE(Qt5Core ${REQUIRED_QT_VERSION} REQUIRED)
 FIND_PACKAGE(Qt5LinguistTools ${REQUIRED_QT_VERSION})
 FIND_PACKAGE(Qt5Gui ${REQUIRED_QT_VERSION} REQUIRED)
@@ -20,13 +20,12 @@ FIND_PACKAGE(Sword 1.8.1 REQUIRED)
 ######################################################
 # Build options, definitions, linker flags etc for all targets:
 #
-INCLUDE(BTCompileFlags)
 INCLUDE(BTUseCcache)
 INCLUDE(CheckIPOSupported)
 CHECK_IPO_SUPPORTED(RESULT HAVE_IPO)
 MESSAGE(STATUS "Interprocedural optimization support: ${HAVE_IPO}")
 FUNCTION(PREPARE_CXX_TARGET target)
-    TARGET_COMPILE_FEATURES("${target}" PUBLIC cxx_std_17)
+    TARGET_COMPILE_FEATURES("${target}" PUBLIC cxx_std_11)
     SET_TARGET_PROPERTIES("${target}" PROPERTIES CXX_EXTENSIONS NO)
     IF(HAVE_IPO)
         SET_TARGET_PROPERTIES("${target}" PROPERTIES
@@ -35,10 +34,7 @@ FUNCTION(PREPARE_CXX_TARGET target)
 ENDFUNCTION()
 SET(CMAKE_AUTOMOC ON)
 SET(CMAKE_AUTORCC ON)
-ADD_DEFINITIONS(
-    "-DBT_VERSION=\"${BT_VERSION_FULL}\""
-    "-DQT_NO_KEYWORDS"
-)
+ADD_DEFINITIONS("-DBT_VERSION=\"${BT_VERSION_FULL}\"")
 IF("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     SET(CMAKE_AUTOMOC_MOC_OPTIONS "-DNDEBUG")
 ENDIF()
@@ -46,9 +42,11 @@ IF(WIN32)
     ADD_COMPILE_OPTIONS("/Zi")
 ELSE()
     ADD_COMPILE_OPTIONS(
-        "-O2" "-ggdb" "-Wall" "-Wextra"
+        "-ggdb" "-Wall" "-Wextra"
+        "$<$<STREQUAL:$<CONFIGURATION>,Release>:-O2>"
         "$<$<STREQUAL:$<CONFIGURATION>,Release>:-DNDEBUG>"
         "$<$<STREQUAL:$<CONFIGURATION>,Release>:-DQT_NO_DEBUG>"
+        "$<$<NOT:$<STREQUAL:$<CONFIGURATION>,Release>>:-fno-omit-frame-pointer>"
     )
 ENDIF()
 UNSET(BibleTime_CXXFLAGS)
@@ -61,7 +59,7 @@ ELSE()
   SET(CMAKE_CXX_FLAGS_RELEASE "")
   SET(CMAKE_CXX_FLAGS_DEBUG "")
   IF(APPLE)
-    SET(T "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.14.sdk/")
+    SET(T "/Applications/Xcode_12.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/")
     LIST(APPEND BibleTime_CXXFLAGS
         "-mmacosx-version-min=10.12"
         "-stdlib=libc++"
@@ -76,9 +74,8 @@ ENDIF()
 
 
 ######################################################
-# bibletime_backend object library. This mostly exists for the purpose of
-# keeping the backend and frontend as separate modules with no GUI dependencies
-# or frontend code in the backend.
+# bibletime_backend static library. Shared between the bibletime app and all
+# tests:
 #
 FILE(GLOB_RECURSE bibletime_BACKEND_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/*.cpp"
@@ -86,7 +83,7 @@ FILE(GLOB_RECURSE bibletime_BACKEND_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/util/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/util/*.h"
 )
-ADD_LIBRARY(bibletime_backend OBJECT ${bibletime_BACKEND_SOURCES})
+ADD_LIBRARY(bibletime_backend STATIC ${bibletime_BACKEND_SOURCES})
 GET_SOURCE_FILE_PROPERTY(d
     "${CMAKE_CURRENT_SOURCE_DIR}/src/util/directory.cpp" COMPILE_DEFINITIONS)
 IF(DEFINED BT_RUNTIME_DOCDIR)
@@ -104,27 +101,6 @@ TARGET_COMPILE_OPTIONS(bibletime_backend
     PUBLIC
         ${BibleTime_CXXFLAGS}
         ${Sword_CFLAGS_OTHER}
-)
-BtAddCxxCompilerFlags(bibletime_backend PUBLIC
-    "-Walloca"
-    "-Wextra-semi"
-    "-Wformat=2"
-    "-Wformat-signedness"
-    "-Wfloat-equal"
-    "-Wformat"
-    "-Wlogical-op"
-    "-Wno-packed"
-    "-Wno-padded"
-    "-Wno-switch-enum"
-    "-Wpointer-arith"
-    "-Wsuggest-override"
-    "-Wunused-parameter"
-    "-Wzero-as-null-pointer-constant"
-    "-fasynchronous-unwind-tables"
-    "-fcf-protection=full"
-    "-fstack-clash-protection"
-    "-fstack-protector-strong"
-    "-pipe"
 )
 TARGET_INCLUDE_DIRECTORIES(bibletime_backend
     PRIVATE
@@ -211,13 +187,19 @@ INSTALL(FILES "pics/startuplogo.png" "pics/startuplogo_christmas.png"
 # Linux: application icon and desktop file:
 INSTALL(FILES "${CMAKE_CURRENT_SOURCE_DIR}/pics/icons/bibletime.svg"
         DESTINATION "${BT_DATAROOTDIR}/icons/hicolor/scalable/apps" RENAME "info.bibletime.BibleTime.svg")
+
+
 CONFIGURE_FILE("${CMAKE_CURRENT_SOURCE_DIR}/cmake/platforms/linux/bibletime.desktop.cmake"
                "${CMAKE_CURRENT_BINARY_DIR}/bibletime.desktop" @ONLY)
 INSTALL(FILES "${CMAKE_CURRENT_BINARY_DIR}/bibletime.desktop"
         DESTINATION "${BT_DATAROOTDIR}/applications/" RENAME "info.bibletime.BibleTime.desktop")
 
-INSTALL(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/platforms/linux/info.bibletime.BibleTime.metainfo.xml"
+
+CONFIGURE_FILE("${CMAKE_CURRENT_SOURCE_DIR}/cmake/platforms/linux/info.bibletime.BibleTime.metainfo.xml"
+        "${CMAKE_CURRENT_BINARY_DIR}/info.bibletime.BibleTime.metainfo.xml" @ONLY)
+INSTALL(FILES "${CMAKE_CURRENT_BINARY_DIR}/info.bibletime.BibleTime.metainfo.xml"
         DESTINATION "${BT_DATAROOTDIR}/metainfo/")
+
 
 
 IF(MSVC) # Windows:

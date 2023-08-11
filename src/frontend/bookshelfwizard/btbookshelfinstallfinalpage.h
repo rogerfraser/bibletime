@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTBOOKSHELFINSTALLFINALPAGE
+#define BTBOOKSHELFINSTALLFINALPAGE
 
 #include "btbookshelfwizardpage.h"
 
@@ -32,8 +33,9 @@ class BtBookshelfInstallFinalPage final: public BtBookshelfWizardPage {
 
 public: /* Methods: */
 
-    BtBookshelfInstallFinalPage(QWidget * parent = nullptr);
-    ~BtBookshelfInstallFinalPage() noexcept final override { destroyThread(); }
+    BtBookshelfInstallFinalPage(QWidget * parent = 0);
+    inline ~BtBookshelfInstallFinalPage() noexcept final override
+    { destroyThread(); }
 
     void destroyThread() noexcept;
 
@@ -42,10 +44,10 @@ public: /* Methods: */
     int nextId() const final override;
     BtModuleSet selectedWorks() const;
 
-public Q_SLOTS:
+public slots:
     void slotStopInstall();
 
-private Q_SLOTS:
+private slots:
 
     void slotInstallStarted(int moduleIndex);
     void slotOneItemCompleted(int moduleIndex, bool status);
@@ -72,3 +74,5 @@ private: /* Fields: */
     int m_lastStatus = -1;
 
 }; /* class BtBookshelfInstallFinalPage */
+
+#endif

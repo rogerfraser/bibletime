@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -12,7 +12,6 @@
 
 #include "cplaintextexportrendering.h"
 
-#include <memory>
 #include "../keys/cswordkey.h"
 
 
@@ -22,7 +21,7 @@ CPlainTextExportRendering::CPlainTextExportRendering(
         bool addText,
         const DisplayOptions &displayOptions,
         const FilterOptions &filterOptions)
-        : CTextRendering(addText, displayOptions, filterOptions)
+        : CHTMLExportRendering(addText, displayOptions, filterOptions)
 {
     // Intentionally empty
 }
@@ -30,22 +29,21 @@ CPlainTextExportRendering::CPlainTextExportRendering(
 QString CPlainTextExportRendering::renderEntry(const KeyTreeItem &i,
                                                CSwordKey * k)
 {
-    Q_UNUSED(k)
+    Q_UNUSED(k);
 
     if (!m_addText)
         return QString(i.key()).append("\n");
 
     const BtConstModuleList modules = i.modules();
-    std::unique_ptr<CSwordKey> const key(
-                CSwordKey::createInstance(modules.first()));
+    CSwordKey * key = CSwordKey::createInstance(modules.first());
     QString renderedText = QString(i.key());
     if (modules.count() > 1) {
-        for (auto const * const module : modules)
+        Q_FOREACH(CSwordModuleInfo const * const module, modules)
             renderedText += "   " + module->name();
     }
     renderedText += ":\n";
 
-    for (auto const * const module : modules) {
+    Q_FOREACH(CSwordModuleInfo const * const module, modules) {
         key->setModule(module);
         key->setKey(i.key());
         QString entry = key->strippedText().append("\n");
@@ -53,11 +51,13 @@ QString CPlainTextExportRendering::renderEntry(const KeyTreeItem &i,
             entry.append("\n");
         renderedText.append( entry );
     }
+
+    delete key;
     return renderedText;
 }
 
 QString CPlainTextExportRendering::finishText(const QString &text, const KeyTree &tree) {
-    Q_UNUSED(tree)
+    Q_UNUSED(tree);
     return text;
 }
 

@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BT_MODULECHOOSERHEADERWIDGET
+#define BT_MODULECHOOSERHEADERWIDGET
 
 #include <QWidget>
 
@@ -50,7 +51,7 @@ class BtTextWindowHeaderWidget : public QWidget {
         */
         void updateWidget(QStringList newModulesToUse, QString thisModule, int newIndex, int leftLikeModules);
 
-    Q_SIGNALS:
+    signals:
         /** User selected a module from menu to replace an existing module.*/
         void sigModuleReplace ( int index, QString newModule );
         /** User selected a module from menu to add. */
@@ -64,7 +65,10 @@ class BtTextWindowHeaderWidget : public QWidget {
         QAction* m_removeAction;
         BtModuleChooserMenu * m_replaceMenu;
         BtModuleChooserMenu * m_addMenu;
+        CSwordModuleInfo::ModuleType m_moduleType;
         QLabel* m_iconLabel;
         QLabel* m_label;
         QToolButton* m_button;
 };
+
+#endif

@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -14,37 +14,34 @@
 
 #include <QTextCodec>
 #include "../../util/btassert.h"
-#include "../../util/cp1252.h"
 #include "../drivers/cswordlexiconmoduleinfo.h"
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wextra-semi"
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <swmodule.h>
 #include <swld.h>
 #include <utilstr.h>
-#pragma GCC diagnostic pop
 
 
-CSwordLDKey::CSwordLDKey(CSwordModuleInfo const * module)
-    : CSwordKey(module)
-{ m_key = " "; }
+CSwordLDKey::CSwordLDKey(const CSwordModuleInfo *module) {
+    if ((m_module = dynamic_cast<const CSwordLexiconModuleInfo*>(module))) {
+        //    *(m_module->module()) = TOP;
+    }
+
+    SWKey::operator= (" ");
+}
 
 /** No descriptions */
 CSwordLDKey::CSwordLDKey(CSwordLDKey const & k)
     : CSwordKey(k)
-    , m_key(k.m_key.getText())
+    , SWKey(k.getText())
 {}
 
 /** No descriptions */
-CSwordLDKey::CSwordLDKey(const sword::SWKey *k, const CSwordModuleInfo *module)
-    : CSwordKey(module)
-    , m_key(*k)
-{}
-
-sword::SWKey const & CSwordLDKey::asSwordKey() const noexcept { return m_key; }
+CSwordLDKey::CSwordLDKey(const SWKey *k, const CSwordModuleInfo *module)
+    : CSwordKey(module), SWKey(*k)
+{
+    // Intentionally empty
+}
 
 /** Clones this object by copying the members. */
 CSwordLDKey* CSwordLDKey::copy() const {
@@ -67,14 +64,14 @@ QString CSwordLDKey::key() const {
     BT_ASSERT(m_module);
 
     if (m_module->isUnicode()) {
-        return QString::fromUtf8(m_key.getText());
+        return QString::fromUtf8(getText());
     } else {
-        return util::cp1252().toUnicode(m_key.getText());
+        return cp1252Codec()->toUnicode(getText());
     }
 }
 
 const char * CSwordLDKey::rawKey() const {
-    return m_key.getText();
+    return getText();
 }
 
 bool CSwordLDKey::setKey(const QString &newKey) {
@@ -84,7 +81,7 @@ bool CSwordLDKey::setKey(const QString &newKey) {
         return setKey(newKey.toUtf8().constData());
     }
     else {
-        return setKey(util::cp1252().fromUnicode(newKey).constData());
+        return setKey(cp1252Codec()->fromUnicode(newKey).constData());
     }
 }
 
@@ -94,18 +91,18 @@ bool CSwordLDKey::setKey(const char *newKey) {
     BT_ASSERT(newKey);
 
     if (newKey) {
-        m_key = newKey; //set the key
-        m_module->module().setKey(&m_key);
+        SWKey::operator = (newKey); //set the key
+        m_module->module().setKey(this);
         m_module->snap();
     }
 
-    return !m_key.popError();
+    return !popError();
 }
 
 /** Uses the parameter to returns the next entry afer this key. */
 CSwordLDKey* CSwordLDKey::NextEntry() {
     auto & m = m_module->module();
-    m.setKey(&m_key); // use this key as base for the next one!
+    m.setKey(this); // use this key as base for the next one!
     //   m.getKey()->setText( (const char*)key().utf8() );
 
     m.setSkipConsecutiveLinks(true);
@@ -113,7 +110,7 @@ CSwordLDKey* CSwordLDKey::NextEntry() {
     m.setSkipConsecutiveLinks(false);
 
     setKey(m.getKeyText());
-    m_key.setText(m.getKeyText());
+    setText(m.getKeyText());
 
     return this;
 }
@@ -121,14 +118,14 @@ CSwordLDKey* CSwordLDKey::NextEntry() {
 /** Uses the parameter to returns the next entry afer this key. */
 CSwordLDKey* CSwordLDKey::PreviousEntry() {
     auto & m = m_module->module();
-    m.setKey(&m_key); // use this key as base for the next one!
+    m.setKey(this); // use this key as base for the next one!
     //   m.getKey()->setText( (const char*)key().utf8() );
 
     m.setSkipConsecutiveLinks(true);
     m--;
     m.setSkipConsecutiveLinks(false);
 
-    m_key.setText(m.getKeyText());
+    setText(m.getKeyText());
 
     return this;
 }

@@ -2,17 +2,18 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CBIBLEREADWINDOW_H
+#define CBIBLEREADWINDOW_H
 
-#include "cdisplaywindow.h"
+#include "clexiconreadwindow.h"
 
 #include <QAction>
 #include "../cexportmanager.h"
@@ -27,28 +28,39 @@ class QEvent;
 class QMenu;
 class QObject;
 
-class CBibleReadWindow: public CDisplayWindow  {
+class CBibleReadWindow: public CLexiconReadWindow  {
 
     Q_OBJECT
 
 public: /* Methods: */
 
-    CBibleReadWindow(QList<CSwordModuleInfo *> const & modules,
-                     CMDIArea * parent)
-        : CDisplayWindow(modules, parent)
-    {}
+    inline CBibleReadWindow(const QList<CSwordModuleInfo*> & modules, CMDIArea* parent)
+        : CLexiconReadWindow(modules, parent) {}
 
     CSwordModuleInfo::ModuleType moduleType() const override
     { return CSwordModuleInfo::Bible; }
 
-    void storeProfileSettings(BtConfigCore & windowConf) const override;
-    void applyProfileSettings(BtConfigCore const & windowConf) override;
+    void storeProfileSettings(QString const & windowGroup) const override;
+    void applyProfileSettings(const QString & windowGroup) override;
     static void insertKeyboardActions( BtActionCollection* const a );
 
 protected: /* Methods: */
 
+    template <typename ... Args>
+    QAction & initAction(QString actionName, Args && ... args) {
+        QAction & action = m_actionCollection->action(std::move(actionName));
+        BT_CONNECT(&action,
+                   &QAction::triggered,
+                   std::forward<Args>(args)...);
+        addAction(&action);
+        return action;
+    }
+
     void initActions() override;
+    void initToolbars() override;
+    void initConnections() override;
     void initView() override;
+    void setupMainWindowToolBars() override;
     void setupPopupMenu() override;
     void updatePopupMenu() override;
     bool eventFilter( QObject* o, QEvent* e) override;
@@ -88,7 +100,7 @@ protected: /* Methods: */
     m_actions;
 
 
-public Q_SLOTS:
+public slots:
 
     void nextBook();
     void previousBook();
@@ -99,7 +111,7 @@ public Q_SLOTS:
 
     void reload(CSwordBackend::SetupChangedReason reason) override;
 
-protected Q_SLOTS:
+protected slots:
 
     /**
         * Copies the current chapter into the clipboard.
@@ -126,3 +138,5 @@ private: /* Methods: */
     void saveChapter(CExportManager::Format const format);
 
 };
+
+#endif /* CBIBLEREADWINDOW_H */

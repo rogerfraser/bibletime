@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTBOOKMARKSMODEL_H
+#define BTBOOKMARKSMODEL_H
 
 #include <QAbstractItemModel>
 
@@ -131,7 +132,7 @@ public: /* Methods: */
     */
     QHash<int, QByteArray> roleNames() const override;
 
-public Q_SLOTS:
+public slots:
 
     /**
       \brief Save bookmarks or specified branch to file.
@@ -156,10 +157,12 @@ public Q_SLOTS:
 
 private:
 
-    bool slotSave() { return save(); }
+    inline bool slotSave() { return save(); }
 
 private: /* Fields: */
     Q_DECLARE_PRIVATE(BtBookmarksModel)
     BtBookmarksModelPrivate * const d_ptr;
 
 };
+
+#endif // BTBOOKMARKSMODEL_H

@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -37,6 +37,7 @@
 
 BtBookshelfWidget::BtBookshelfWidget(QWidget *parent, Qt::WindowFlags flags)
     : QWidget(parent, flags)
+    , m_sourceModel(nullptr)
     , m_treeModel(nullptr)
     , m_leftCornerWidget(nullptr)
     , m_rightCornerWidget(nullptr)
@@ -54,31 +55,20 @@ BtBookshelfWidget::BtBookshelfWidget(QWidget *parent, Qt::WindowFlags flags)
 
     retranslateUi();
 
-    BT_CONNECT(m_nameFilterEdit,  &QLineEdit::textEdited,
-               m_postFilterModel,
-               &BtBookshelfFilterModel::setNameFilterFixedString);
-    BT_CONNECT(m_treeView, &BtBookshelfView::contextMenuActivated,
-               [this](QPoint const & pos){ m_contextMenu->popup(pos); });
-    BT_CONNECT(m_treeView, &BtBookshelfView::moduleContextMenuActivated,
-               [this](CSwordModuleInfo * const module, QPoint const & pos) {
-                   if (!m_itemContextMenu)
-                       m_itemContextMenu = m_contextMenu;
-                   m_itemContextMenu->setProperty(
-                               "BtModule",
-                               QVariant::fromValue(
-                                   static_cast<void *>(module)));
-                   m_itemContextMenu->popup(pos);
-               });
+    BT_CONNECT(m_nameFilterEdit,  SIGNAL(textEdited(QString)),
+               m_postFilterModel, SLOT(setNameFilterFixedString(QString)));
+    BT_CONNECT(m_treeView, SIGNAL(contextMenuActivated(QPoint)),
+               this,       SLOT(slotShowContextMenu(QPoint)));
+    BT_CONNECT(m_treeView,
+               SIGNAL(moduleContextMenuActivated(CSwordModuleInfo *, QPoint)),
+               this, SLOT(slotShowItemContextMenu(CSwordModuleInfo *, QPoint)));
 }
 
-void
-BtBookshelfWidget::setSourceModel(std::shared_ptr<QAbstractItemModel> model) {
+void BtBookshelfWidget::setSourceModel(QAbstractItemModel *model) {
     BT_ASSERT(model);
-    if (m_treeModel) {
-        m_sourceModel = model;
-        m_treeModel->setSourceModel(std::move(model));
-    } else {
-        m_sourceModel = std::move(model);
+    m_sourceModel = model;
+    if (m_treeModel != nullptr) {
+        m_treeModel->setSourceModel(model);
     }
 }
 
@@ -108,19 +98,19 @@ void BtBookshelfWidget::initActions() {
     m_showHideAction = new QAction(this);
     m_showHideAction->setIcon(CResMgr::mainIndex::showHide::icon());
     m_showHideAction->setCheckable(true);
-    BT_CONNECT(m_showHideAction,  &QAction::toggled,
-               m_postFilterModel, &BtBookshelfFilterModel::setShowHidden);
+    BT_CONNECT(m_showHideAction,  SIGNAL(toggled(bool)),
+               m_postFilterModel, SLOT(setShowHidden(bool)));
 }
 
 void BtBookshelfWidget::initMenus() {
     // Grouping menu:
     m_groupingMenu = new BtBookshelfGroupingMenu(this);
     BT_CONNECT(m_groupingMenu,
-               &BtBookshelfGroupingMenu::signalGroupingOrderChanged,
-               [this](BtBookshelfTreeModel::Grouping const & grouping) {
-                   m_treeModel->setGroupingOrder(grouping);
-                   m_treeView->setRootIsDecorated(!grouping.isEmpty());
-               });
+               SIGNAL(signalGroupingOrderChanged(
+                          BtBookshelfTreeModel::Grouping)),
+               this,
+               SLOT(slotGroupingActionTriggered(
+                        BtBookshelfTreeModel::Grouping)));
 
     // Context menu
     m_contextMenu = new QMenu(this);
@@ -187,6 +177,28 @@ bool BtBookshelfWidget::eventFilter(QObject *object, QEvent *event) {
         }
     }
     return false;
+}
+
+void BtBookshelfWidget::slotGroupingActionTriggered(const BtBookshelfTreeModel::Grouping &grouping) {
+    m_treeModel->setGroupingOrder(grouping);
+    m_treeView->setRootIsDecorated(!grouping.isEmpty());
+}
+
+void BtBookshelfWidget::slotShowContextMenu(const QPoint &pos) {
+    m_contextMenu->popup(pos);
+}
+
+void BtBookshelfWidget::slotShowItemContextMenu(CSwordModuleInfo *module, const QPoint &pos)
+{
+    if (m_itemContextMenu != nullptr) {
+        m_itemContextMenu->setProperty("BtModule",
+                                       QVariant::fromValue(
+                                           static_cast<void *>(module)));
+        m_itemContextMenu->popup(pos);
+    } else {
+        m_itemContextMenu = m_contextMenu;
+        slotShowItemContextMenu(module, pos);
+    }
 }
 
 void BtBookshelfWidget::findExpanded(

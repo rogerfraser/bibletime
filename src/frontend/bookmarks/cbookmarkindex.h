@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CBOOKMARKINDEX_H
+#define CBOOKMARKINDEX_H
 
 #include <QTimer>
 #include <QToolTip>
@@ -61,7 +62,7 @@ public: /* Methods: */
 
     CBookmarkIndex(QWidget * const parent = nullptr);
 
-Q_SIGNALS:
+signals:
 
     /** \brief Emitted when a module should be opened. */
     void createReadDisplayWindow(QList<CSwordModuleInfo *>, QString const &);
@@ -80,9 +81,52 @@ protected: /* Methods: */
     void mouseMoveEvent(QMouseEvent * event) override;
     void leaveEvent(QEvent * event) override;
 
+protected slots:
+
+    /** Prevents annoying folder collapsing while dropping. */
+    void expandAutoCollapsedItem(QModelIndex const & index) { expand(index); }
+
+    /** Is called when an item was clicked or activated. */
+    void slotExecuted(QModelIndex const & index);
+
+    /** Shows the context menu at the given position. */
+    void contextMenu(QPoint const & p);
+
+    /** Adds a new subfolder to the current item. */
+    void createNewFolder();
+
+    /** Opens a dialog to change the current folder. */
+    void changeFolder();
+
+    /** Exports the bookmarks from the selected folder. */
+    void exportBookmarks();
+
+    /** Changes the current bookmark. */
+    void editBookmark();
+
+    /** Sorts the current folder bookmarks. */
+    void sortFolderBookmarks();
+
+    /** Sorts all bookmarks. */
+    void sortAllBookmarks();
+
+    /** Import bookmarks from a file and add them to the selected folder. */
+    void importBookmarks();
+
+    /** Deletes the selected entries after user confirmation. */
+    void confirmDeleteEntries();
+
+    /** Deletes the selected entries. */
+    void deleteEntries();
+
+    /** Prints the selected bookmarks. */
+    void printBookmarks();
+
+    /** Slot for the mag update timer. */
+    void magTimeout();
+
 private: /* Methods: */
 
-    void deleteEntries();
     bool enableAction(QModelIndex const & index,
                       MenuAction const type) const;
 
@@ -107,3 +151,5 @@ private: /* Fields: */
     BtBookmarksModel * m_bookmarksModel;
 
 };
+
+#endif

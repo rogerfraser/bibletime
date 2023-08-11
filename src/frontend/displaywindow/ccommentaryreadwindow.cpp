@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -21,7 +21,8 @@
 #include "../../util/cresmgr.h"
 #include "../bibletime.h"
 #include "../bibletimeapp.h"
-#include "../display/btmodelviewreaddisplay.h"
+#include "../display/cdisplay.h"
+#include "../display/creaddisplay.h"
 #include "../keychooser/ckeychooser.h"
 #include "btactioncollection.h"
 #include "btmodulechooserbar.h"
@@ -63,18 +64,27 @@ void CCommentaryReadWindow::insertKeyboardActions(BtActionCollection* const a) {
 }
 
 void CCommentaryReadWindow::initActions() {
-    CDisplayWindow::initActions(); //make sure the predefined actions are available
+    CLexiconReadWindow::initActions(); //make sure the predefined actions are available
     BtActionCollection* ac = actionCollection();
     insertKeyboardActions(ac);
 
-    initAddAction("nextBook", this, &CCommentaryReadWindow::nextBook);
-    initAddAction("previousBook", this, &CCommentaryReadWindow::previousBook);
-    initAddAction("nextChapter", this, &CCommentaryReadWindow::nextChapter);
-    initAddAction("previousChapter",
-                  this,
-                  &CCommentaryReadWindow::previousChapter);
-    initAddAction("nextVerse", this, &CCommentaryReadWindow::nextVerse);
-    initAddAction("previousVerse", this, &CCommentaryReadWindow::previousVerse);
+    ac->action("nextEntry").setEnabled(false);
+    ac->action("previousEntry").setEnabled(false);
+
+    auto const initAction = [this, ac](QString actionName,
+                                       void (CCommentaryReadWindow::* slot)())
+    {
+        QAction & action = ac->action(std::move(actionName));
+        BT_CONNECT(&action, &QAction::triggered, this, slot);
+        addAction(&action);
+    };
+
+    initAction("nextBook", &CCommentaryReadWindow::nextBook);
+    initAction("previousBook", &CCommentaryReadWindow::previousBook);
+    initAction("nextChapter", &CCommentaryReadWindow::nextChapter);
+    initAction("previousChapter", &CCommentaryReadWindow::previousChapter);
+    initAction("nextVerse", &CCommentaryReadWindow::nextVerse);
+    initAction("previousVerse", &CCommentaryReadWindow::previousVerse);
 
     QAction & qaction = ac->action(CResMgr::displaywindows::commentaryWindow::syncWindow::actionName);
     m_syncButton = &qaction;
@@ -83,33 +93,37 @@ void CCommentaryReadWindow::initActions() {
     actionCollection()->readShortcuts("Commentary shortcuts");
 }
 
-void CCommentaryReadWindow::applyProfileSettings(BtConfigCore const & conf) {
-    CDisplayWindow::applyProfileSettings(conf);
+void CCommentaryReadWindow::applyProfileSettings(const QString & windowGroup) {
+    CLexiconReadWindow::applyProfileSettings(windowGroup);
+
+    BT_ASSERT(windowGroup.endsWith('/'));
     BT_ASSERT(m_syncButton);
-    m_syncButton->setChecked(conf.value<bool>("syncEnabled", false));
+    m_syncButton->setChecked(btConfig().sessionValue<bool>(windowGroup + "syncEnabled", false));
 }
 
-void CCommentaryReadWindow::storeProfileSettings(BtConfigCore & conf)
+void CCommentaryReadWindow::storeProfileSettings(QString const & windowGroup)
         const
 {
-    CDisplayWindow::storeProfileSettings(conf);
+    CLexiconReadWindow::storeProfileSettings(windowGroup);
+
+    BT_ASSERT(windowGroup.endsWith('/'));
     BT_ASSERT(m_syncButton);
-    conf.setValue("syncEnabled", m_syncButton->isChecked());
+    btConfig().setSessionValue(windowGroup + "syncEnabled", m_syncButton->isChecked());
 }
 
 void CCommentaryReadWindow::initToolbars() {
-    CDisplayWindow::initToolbars();
+    CLexiconReadWindow::initToolbars();
     buttonsToolBar()->addAction(m_syncButton);
 }
 
 void CCommentaryReadWindow::setupMainWindowToolBars() {
-    CDisplayWindow::setupMainWindowToolBars();
+    CLexiconReadWindow::setupMainWindowToolBars();
     btMainWindow()->toolsToolBar()->addAction(m_syncButton);
 }
 
 /** Reimplementation to handle the keychooser refresh. */
 void CCommentaryReadWindow::reload(CSwordBackend::SetupChangedReason reason) {
-    CDisplayWindow::reload(reason);
+    CLexiconReadWindow::reload(reason);
 
     //refresh the book lists
     verseKey()->setLocale( CSwordBackend::instance()->booknameLanguage().toLatin1() );
@@ -163,4 +177,12 @@ void CCommentaryReadWindow::previousVerse() {
 
 bool CCommentaryReadWindow::syncAllowed() const {
     return m_syncButton->isChecked();
+}
+
+
+/*!
+    \fn CCommentaryReadWindow::setupPopupMenu()
+ */
+void CCommentaryReadWindow::setupPopupMenu() {
+    CLexiconReadWindow::setupPopupMenu();
 }

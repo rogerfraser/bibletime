@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -48,12 +48,13 @@ static CSearchDialog* m_staticDialog = nullptr;
 void CSearchDialog::openDialog(const BtConstModuleList modules,
                                const QString &searchText, QWidget *parentDialog)
 {
-    if (!m_staticDialog)
+    if (!m_staticDialog) {
         m_staticDialog = new CSearchDialog(parentDialog);
+    };
     m_staticDialog->reset();
 
     if (modules.count()) {
-        m_staticDialog->m_searchOptionsArea->setModules(modules);
+        m_staticDialog->setModules(modules);
     }
     else {
         m_staticDialog->showModulesSelector();
@@ -76,6 +77,12 @@ void CSearchDialog::openDialog(const BtConstModuleList modules,
 void CSearchDialog::closeDialog() {
     if (m_staticDialog != nullptr)
         m_staticDialog->closeButtonClicked();
+}
+
+void CSearchDialog::manageIndexesButtonClicked() {
+
+    BtIndexDialog dlg(this);
+    dlg.exec();
 }
 
 CSearchDialog* CSearchDialog::getSearchDialog() {
@@ -115,21 +122,20 @@ void CSearchDialog::startSearch() {
     // Insert search text into history list of combobox
     m_searchOptionsArea->addToHistory(originalSearchText);
 
-    auto searchModules = modules();
-
     // Check that we have the indices we need for searching
     /// \warning indexing is some kind of internal optimization, so we leave
     /// modules const, but unconst them here only
     QList<CSwordModuleInfo*> unindexedModules;
-    for (auto const * const m : searchModules)
-        if (!m->hasIndex())
-            unindexedModules.append(const_cast<CSwordModuleInfo*>(m));
+    Q_FOREACH(const CSwordModuleInfo * const m,
+              CSwordModuleSearch::unindexedModules(modules()))
+        unindexedModules.append(const_cast<CSwordModuleInfo*>(m));
 
     if (unindexedModules.size() > 0) {
         // Build the list of module names:
         QStringList moduleNameList;
-        for (auto const * const m : unindexedModules)
+        Q_FOREACH (const CSwordModuleInfo *m, unindexedModules) {
             moduleNameList.append(m->name());
+        }
         QString moduleNames("<br><center>");
         moduleNames.append(moduleNameList.join(", "));
         moduleNames.append("</center><br>");
@@ -155,17 +161,22 @@ void CSearchDialog::startSearch() {
         }
     }
 
+    // Set the search options:
+    m_searcher.setSearchedText(searchText);
+    m_searcher.setModules(modules());
+    if (m_searchOptionsArea->hasSearchScope()) {
+        m_searcher.setSearchScope(m_searchOptionsArea->searchScope());
+    } else {
+        m_searcher.resetSearchScope();
+    }
+
     // Disable the dialog:
     setEnabled(false);
     setCursor(Qt::WaitCursor);
 
     // Execute search:
-    CSwordModuleSearch::Results searchResult;
     try {
-        searchResult =
-                CSwordModuleSearch::search(searchText,
-                                           searchModules,
-                                           m_searchOptionsArea->searchScope());
+        m_searcher.startSearch();
     } catch (...) {
         QString msg;
         try {
@@ -187,8 +198,8 @@ void CSearchDialog::startSearch() {
     }
 
     // Display the search results:
-    if (!searchResult.empty()) {
-        m_searchResultArea->setSearchResult(std::move(searchResult));
+    if (m_searcher.foundItems() > 0u) {
+        m_searchResultArea->setSearchResult(m_searcher.results());
     } else {
         m_searchResultArea->reset();
     }
@@ -198,6 +209,17 @@ void CSearchDialog::startSearch() {
     // Re-enable the dialog:
     setEnabled(true);
     setCursor(Qt::ArrowCursor);
+}
+
+void CSearchDialog::startSearch(const BtConstModuleList modules,
+                                const QString &searchText)
+{
+    m_searchResultArea->reset();
+    m_searchOptionsArea->reset();
+    setModules(modules);
+    setSearchText(searchText);
+
+    startSearch();
 }
 
 /** Sets the search text which is used for the search. */
@@ -251,19 +273,19 @@ void CSearchDialog::showModulesSelector() {
 /** Initializes the signal slot connections */
 void CSearchDialog::initConnections() {
     // Search button is clicked
-    BT_CONNECT(m_searchOptionsArea->searchButton(), &QPushButton::clicked,
-               [this] { startSearch(); });
+    BT_CONNECT(m_searchOptionsArea->searchButton(), SIGNAL(clicked()),
+               this,                                SLOT(startSearch()));
     // Return/Enter is pressed in the search text field
-    BT_CONNECT(m_searchOptionsArea, &BtSearchOptionsArea::sigStartSearch,
-               [this] { startSearch(); });
-    BT_CONNECT(m_closeButton, &QPushButton::clicked,
-               this, &CSearchDialog::closeButtonClicked);
+    BT_CONNECT(m_searchOptionsArea, SIGNAL(sigStartSearch()),
+               this,                SLOT(startSearch()) );
+    BT_CONNECT(m_closeButton, SIGNAL(clicked()),
+               this,          SLOT(closeButtonClicked()));
 
-    BT_CONNECT(m_analyseButton, &QPushButton::clicked,
-               m_searchResultArea, &BtSearchResultArea::showAnalysis);
+    BT_CONNECT(m_analyseButton, SIGNAL(clicked()),
+               m_searchResultArea, SLOT(showAnalysis()));
 
-    BT_CONNECT(m_manageIndexes, &QPushButton::clicked,
-               [this] { BtIndexDialog(this).exec(); });
+    BT_CONNECT(m_manageIndexes, SIGNAL(clicked()),
+               this, SLOT(manageIndexesButtonClicked()));
 }
 
 /** Resets the parts to the default. */

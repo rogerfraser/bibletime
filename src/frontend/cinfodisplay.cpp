@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -31,7 +31,9 @@
 #include "../util/btassert.h"
 #include "../util/btconnect.h"
 #include "bibletime.h"
+#include "crossrefrendering.h"
 #include "bttextbrowser.h"
+
 
 using namespace Rendering;
 using namespace sword;
@@ -47,39 +49,30 @@ CInfoDisplay::CInfoDisplay(BibleTime * parent)
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     m_textBrowser = new BtTextBrowser(this);
     m_textBrowser->setContextMenuPolicy(Qt::CustomContextMenu);
-    BT_CONNECT(m_textBrowser, &QTextBrowser::customContextMenuRequested,
-               [this]{
-                   QAction selectAllAction(tr("Select all"));
-                   selectAllAction.setShortcut(QKeySequence::SelectAll);
-                   BT_CONNECT(&selectAllAction, &QAction::triggered,
-                              m_textBrowser, &QTextBrowser::selectAll);
-
-                   QAction copyAction(tr("Copy"));
-                   copyAction.setShortcut(QKeySequence(Qt::CTRL + Qt::Key_C));
-                   BT_CONNECT(&copyAction, &QAction::triggered,
-                              m_textBrowser, &QTextBrowser::copy);
-
-                   QMenu menu;
-                   menu.addAction(&selectAllAction);
-                   menu.addAction(&copyAction);
-                   menu.exec(QCursor::pos());
-               });
-    BT_CONNECT(m_textBrowser, &QTextBrowser::anchorClicked,
-               [this](QUrl const & url) {
-                   auto const decodedLink(
-                               ReferenceManager::decodeHyperlink(
-                                   url.toString()));
-                   if (!decodedLink && !decodedLink->module)
-                       return;
-
-                   auto const * const m = decodedLink->module;
-                   std::unique_ptr<CSwordKey> key(CSwordKey::createInstance(m));
-                   key->setKey(decodedLink->key);
-
-                   setInfo(key->renderedText(), m->language()->abbrev());
-               });
+    BT_CONNECT(m_textBrowser, SIGNAL(customContextMenuRequested(const QPoint&)),
+        this, SLOT(slotContextMenu(const QPoint&)));
+    BT_CONNECT(m_textBrowser, SIGNAL(anchorClicked(const QUrl&)),
+               this, SLOT(lookupInfo(const QUrl&)));
     layout->addWidget(m_textBrowser);
     unsetInfo();
+}
+
+void CInfoDisplay::slotContextMenu(const QPoint& /* point */ ) {
+
+    QAction selectAllAction(tr("Select all"));
+    selectAllAction.setShortcut(QKeySequence::SelectAll);
+    BT_CONNECT(&selectAllAction, SIGNAL(triggered()),
+               this,            SLOT(selectAll()));
+
+    QAction copyAction(tr("Copy"));
+    copyAction.setShortcut(QKeySequence(Qt::CTRL + Qt::Key_C));
+    BT_CONNECT(&copyAction,                     SIGNAL(triggered()),
+               m_textBrowser, SLOT(copy()));
+
+    QMenu menu;
+    menu.addAction(&selectAllAction);
+    menu.addAction(&copyAction);
+    menu.exec(QCursor::pos());
 }
 
 void CInfoDisplay::unsetInfo() {
@@ -102,6 +95,28 @@ void CInfoDisplay::setInfo(const QString & renderedData, const QString & lang) {
     text.replace("#CHAPTERTITLE#", "");
     text = ColorManager::instance().replaceColors(text);
     m_textBrowser->setText(text);
+}
+
+void CInfoDisplay::lookupInfo(const QUrl & url) {
+
+
+    if (!url.isEmpty() && ReferenceManager::isHyperlink(url.toString())) {
+        QString module;
+        QString keyName;
+        ReferenceManager::Type type;
+
+        ReferenceManager::decodeHyperlink(url.toString(), module, keyName, type);
+        if (module.isEmpty()) {
+            module = ReferenceManager::preferredModule( type );
+        }
+
+        CSwordModuleInfo * const m = CSwordBackend::instance()->findModuleByName(module);
+        BT_ASSERT(m);
+        std::unique_ptr<CSwordKey> key(CSwordKey::createInstance(m));
+        key->setKey(keyName);
+
+        setInfo(key->renderedText(), m->language()->abbrev());
+    }
 }
 
 void CInfoDisplay::setInfo(const Rendering::InfoType type, const QString & data) {
@@ -139,11 +154,15 @@ void CInfoDisplay::setInfo(CSwordModuleInfo * const module) {
 
 void CInfoDisplay::setBrowserFont(const CSwordModuleInfo* const module) {
     if (module) {
-            auto const lang = module->language();
+            const CLanguageMgr::Language* lang = module->language();
             m_textBrowser->setFont(btConfig().getFontForLanguage(*lang).second);
     } else {
         m_textBrowser->setFont(btConfig().getDefaultFont());
     }
+}
+
+void CInfoDisplay::selectAll() {
+    m_textBrowser->selectAll();
 }
 
 QSize CInfoDisplay::sizeHint() const {

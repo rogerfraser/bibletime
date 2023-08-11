@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -15,17 +15,14 @@
 #include <QString>
 #include "../config/btconfig.h"
 #include "../drivers/cswordmoduleinfo.h"
-#include "../language.h"
+#include "../managers/clanguagemgr.h"
 #include "../managers/cswordbackend.h"
 #include "../managers/referencemanager.h"
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <swbuf.h>
 #include <swmodule.h>
 #include <utilxml.h>
-#pragma GCC diagnostic pop
 
 
 namespace Filters {
@@ -130,7 +127,11 @@ void TeiToHtml::renderReference(const char *osisRef, sword::SWBuf &buf,
         //if the osisRef like "GerLut:key" contains a module, use that
         int pos = ref.indexOf(":");
 
-        if ((pos >= 0) && ref.at(pos - 1).isLetter() && ref.at(pos + 1).isLetter()) {
+        if ((pos > 0)
+            && (pos < ref.size() - 1)
+            && ref.at(pos - 1).isLetter()
+            && ref.at(pos + 1).isLetter())
+        {
             QString newModuleName = ref.left(pos);
             hrefRef = ref.mid(pos + 1);
 
@@ -140,16 +141,17 @@ void TeiToHtml::renderReference(const char *osisRef, sword::SWBuf &buf,
         }
 
         if (mod) {
-            ReferenceManager::ParseOptions const options{
+            ReferenceManager::ParseOptions const options(
                     mod->name(),
                     QString::fromUtf8(myUserData->key->getText()),
-                    mod->module().getLanguage()};
+                    mod->module().getLanguage());
 
             buf.append("<a href=\"")
                .append( // create the hyperlink with key and mod
                     ReferenceManager::encodeHyperlink(
-                        *mod,
-                        ReferenceManager::parseVerseReference(hrefRef, options)
+                        mod->name(),
+                        ReferenceManager::parseVerseReference(hrefRef, options),
+                        ReferenceManager::typeFromModule(mod->type())
                     ).toUtf8().constData()
                 )
                .append("\" crossrefs=\"")
@@ -188,16 +190,17 @@ void TeiToHtml::renderTargetReference(const char *osisRef, sword::SWBuf &buf,
         }
 
         if (mod) {
-            ReferenceManager::ParseOptions const options{
+            ReferenceManager::ParseOptions const options(
                     mod->name(),
                     QString::fromUtf8(myUserData->key->getText()),
-                    mod->module().getLanguage()};
+                    mod->module().getLanguage());
 
             buf.append("<a class=\"crossreference\" href=\"")
                .append( // create the hyperlink with key and mod
                     ReferenceManager::encodeHyperlink(
-                        *mod,
-                        hrefRef.toUtf8().constData()
+                        mod->name(),
+                        hrefRef.toUtf8().constData(),
+                        ReferenceManager::typeFromModule(mod->type())
                     ).toUtf8().constData()
                 )
                .append("\">");

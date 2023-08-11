@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -51,24 +51,15 @@ CBibleKeyChooser::CBibleKeyChooser(const BtConstModuleList & modules,
     setFocusProxy(w_ref);
     layout->addWidget(w_ref);
 
-    BT_CONNECT(w_ref, &BtBibleKeyWidget::changed,
-               [this](CSwordVerseKey * key) {
-                   BT_ASSERT(m_key);
-                   BT_ASSERT(key);
-
-                   if (!updatesEnabled())
-                       return;
-
-                   setUpdatesEnabled(false);
-                   m_key = key;
-                   Q_EMIT keyChanged(m_key);
-
-                   setUpdatesEnabled(true);
-               });
+    BT_CONNECT(w_ref, SIGNAL(beforeChange(CSwordVerseKey *)),
+               SLOT(beforeRefChange(CSwordVerseKey *)));
+    BT_CONNECT(w_ref, SIGNAL(changed(CSwordVerseKey *)),
+               SLOT(refChanged(CSwordVerseKey *)));
 
     setKey(m_key); //set the key without changing it, setKey(key()) would change it
 
-    BT_CONNECT(this, &CBibleKeyChooser::keyChanged, history(), &BTHistory::add);
+    BT_CONNECT(this,      SIGNAL(keyChanged(CSwordKey *)),
+               history(), SLOT(add(CSwordKey *)));
 }
 
 CSwordKey* CBibleKeyChooser::key() {
@@ -81,7 +72,30 @@ void CBibleKeyChooser::setKey(CSwordKey* key) {
 
     m_key = dynamic_cast<CSwordVerseKey*>(key);
     w_ref->setKey(m_key);
-    Q_EMIT keyChanged(m_key);
+    emit keyChanged(m_key);
+}
+
+void CBibleKeyChooser::beforeRefChange(CSwordVerseKey* key) {
+    Q_UNUSED(key);
+
+    BT_ASSERT(m_key);
+
+    if (!updatesEnabled())
+        return;
+}
+
+void CBibleKeyChooser::refChanged(CSwordVerseKey* key) {
+    BT_ASSERT(m_key);
+    BT_ASSERT(key);
+
+    if (!updatesEnabled())
+        return;
+
+    setUpdatesEnabled(false);
+    m_key = key;
+    emit keyChanged(m_key);
+
+    setUpdatesEnabled(true);
 }
 
 void CBibleKeyChooser::setModules(const BtConstModuleList &modules,
@@ -91,7 +105,7 @@ void CBibleKeyChooser::setModules(const BtConstModuleList &modules,
 
     m_modules.clear();
 
-    for (auto const * const mod : modules)
+    Q_FOREACH(CSwordModuleInfo const * const mod, modules)
         if (mod->type() == CSwordModuleInfo::Bible
             || mod->type() == CSwordModuleInfo::Commentary)
             if (CSBMI const * const bible = dynamic_cast<CSBMI const *>(mod))
@@ -110,7 +124,9 @@ void CBibleKeyChooser::updateKey(CSwordKey* /*key*/) {
     w_ref->updateText();
 }
 
-void CBibleKeyChooser::handleHistoryMoved(QString const & newKey) {
+void CBibleKeyChooser::adjustFont() {}
+
+void CBibleKeyChooser::setKey(const QString & newKey) {
     m_key->setKey(newKey);
     setKey(m_key);
 }

@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTEDITBOOKMARKDIALOG_H
+#define BTEDITBOOKMARKDIALOG_H
 
 #include <QDialog>
 #include <QLineEdit>
@@ -37,12 +38,14 @@ class BtEditBookmarkDialog : public QDialog  {
         /**
         * Returns the description written in the description box.
         */
-        QString descriptionText() { return m_descriptionEdit->toPlainText(); }
+        inline const QString descriptionText() {
+            return m_descriptionEdit->toPlainText();
+        }
 
         /**
         * Returns the title written in the title box.
         */
-        QString titleText() { return m_titleEdit->text(); }
+        inline const QString titleText() { return m_titleEdit->text(); }
 
     protected: /* Methods: */
         void retranslateUi();
@@ -58,3 +61,5 @@ class BtEditBookmarkDialog : public QDialog  {
         QDialogButtonBox *m_buttonBox;
 
 };
+
+#endif

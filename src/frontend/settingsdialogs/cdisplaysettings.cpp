@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -19,7 +19,6 @@
 #include <QVBoxLayout>
 #include <QFormLayout>
 #include "../../backend/config/btconfig.h"
-#include "../../backend/managers/btlocalemgr.h"
 #include "../../backend/managers/colormanager.h"
 #include "../../backend/managers/cdisplaytemplatemgr.h"
 #include "../../backend/rendering/cdisplayrendering.h"
@@ -31,8 +30,10 @@
 #include "cconfigurationdialog.h"
 
 // Sword includes:
+#include <localemgr.h>
 #include <swlocale.h>
 
+using SBLCI = std::list<sword::SWBuf>::const_iterator;
 
 /** Initializes the startup section of the OD. */
 CDisplaySettingsPage::CDisplaySettingsPage(CConfigurationDialog *parent)
@@ -56,9 +57,8 @@ CDisplaySettingsPage::CDisplaySettingsPage(CConfigurationDialog *parent)
     initSwordLocaleCombo();
 
     m_styleChooserCombo = new QComboBox( this ); //create first to enable buddy for label
-    BT_CONNECT(m_styleChooserCombo,
-               static_cast<void (QComboBox::*)(int)>(&QComboBox::activated),
-               this, &CDisplaySettingsPage::updateStylePreview);
+    BT_CONNECT(m_styleChooserCombo, SIGNAL(activated(int)),
+               this,                SLOT(updateStylePreview()));
 
     m_availableLabel = new QLabel(this);
     m_availableLabel->setBuddy(m_styleChooserCombo);
@@ -126,19 +126,21 @@ void CDisplaySettingsPage::retranslateUi() {
 void CDisplaySettingsPage::resetLanguage() {
     QVector<QString> atv = bookNameAbbreviationsTryVector();
 
-    BT_ASSERT(!atv.isEmpty());
-    QString best = atv.takeLast();
-    for (auto const & localePair : BtLocaleMgr::internalSwordLocales()) {
-        auto const & swordAbbreviation = localePair.first;
-        if (swordAbbreviation == "locales")
-            continue;
-        auto abbreviation =
-                util::tool::fixSwordBcp47(swordAbbreviation.c_str());
-        if (auto const i = atv.indexOf(abbreviation); i >= 0) {
-            best = std::move(abbreviation);
-            if (i == 0)
-                break;
-            atv.resize(i);
+    QString best = "en_US";
+    BT_ASSERT(atv.contains(best));
+    int i = atv.indexOf(best);
+    if (i > 0) {
+        atv.resize(i);
+        const std::list<sword::SWBuf> locales = sword::LocaleMgr::getSystemLocaleMgr()->getAvailableLocales();
+        for (SBLCI it = locales.begin(); it != locales.end(); ++it) {
+            const char * abbr = sword::LocaleMgr::getSystemLocaleMgr()->getLocale((*it).c_str())->getName();
+            i = atv.indexOf(abbr);
+            if (i >= 0) {
+                best = abbr;
+                if (i == 0)
+                    break;
+                atv.resize(i);
+            }
         }
     }
     btConfig().setValue("GUI/booknameLanguage", best);
@@ -148,46 +150,48 @@ QVector<QString> CDisplaySettingsPage::bookNameAbbreviationsTryVector() {
     QVector<QString> atv;
     atv.reserve(4);
     {
-        QString settingsLanguage = btConfig().booknameLanguage();
+        QString settingsLanguage = btConfig().value<QString>("GUI/booknameLanguage");
         if (!settingsLanguage.isEmpty())
             atv.append(settingsLanguage);
     }
     {
-        auto localeLanguageAndCountry = QLocale().name(); // ISO 639 _ ISO 3166
+        const QString localeLanguageAndCountry = QLocale().name();
         if (!localeLanguageAndCountry.isEmpty()) {
-            localeLanguageAndCountry.replace('_', '-'); // Ensure BCP 47
             atv.append(localeLanguageAndCountry);
-            if (auto const i = localeLanguageAndCountry.indexOf('-'); i > 0)
+            int i = localeLanguageAndCountry.indexOf('_');
+            if (i > 0)
                 atv.append(localeLanguageAndCountry.left(i));
         }
     }
-    atv.append(Language::fromAbbrev({})->abbrev());
+    BT_ASSERT(CLanguageMgr::instance()->languageForAbbrev("en_US"));
+    atv.append("en_US");
     return atv;
 }
 
 void CDisplaySettingsPage::initSwordLocaleCombo() {
-    QMap<QString, QString> languageNames;
-    {
-        auto const defaultLanguage = Language::fromAbbrev({});
-        languageNames.insert(defaultLanguage->translatedName(),
-                             defaultLanguage->abbrev());
-    }
+    using SSMCI = QMap<QString, QString>::const_iterator;
 
-    for (auto const & localePair : BtLocaleMgr::internalSwordLocales()) {
-        auto const & swordAbbreviation = localePair.first;
-        if (swordAbbreviation.size() <= 0)
-            continue; // work around Sword not checking [Meta] Name= validity
-        if (swordAbbreviation == "locales")
-            continue;
-        auto abbreviation =
-                util::tool::fixSwordBcp47(swordAbbreviation.c_str());
-        auto const l = Language::fromAbbrev(std::move(abbreviation));
-        languageNames.insert(l->translatedName(), l->abbrev());
+    QMap<QString, QString> languageNames;
+    BT_ASSERT(CLanguageMgr::instance()->languageForAbbrev("en_US"));
+    languageNames.insert(CLanguageMgr::instance()->languageForAbbrev("en_US")->translatedName(), "en_US");
+
+    const std::list<sword::SWBuf> locales = sword::LocaleMgr::getSystemLocaleMgr()->getAvailableLocales();
+    for (SBLCI it = locales.begin(); it != locales.end(); ++it) {
+        const char * const abbreviation = sword::LocaleMgr::getSystemLocaleMgr()->getLocale((*it).c_str())->getName();
+        const CLanguageMgr::Language * const l = CLanguageMgr::instance()->languageForAbbrev(abbreviation);
+
+        if (l->isValid()) {
+            languageNames.insert(l->translatedName(), abbreviation);
+        } else {
+            languageNames.insert(
+                sword::LocaleMgr::getSystemLocaleMgr()->getLocale((*it).c_str())->getDescription(),
+                abbreviation);
+        }
     }
 
     int index = 0;
     QVector<QString> atv = bookNameAbbreviationsTryVector();
-    for (auto it = languageNames.constBegin(); it != languageNames.constEnd(); ++it) {
+    for (SSMCI it = languageNames.constBegin(); it != languageNames.constEnd(); ++it) {
         if (!atv.isEmpty()) {
             int i = atv.indexOf(it.value());
             if (i >= 0) {
@@ -211,16 +215,17 @@ void CDisplaySettingsPage::updateStylePreview() {
     CTextRendering::KeyTreeItem::Settings settings;
     settings.highlight = false;
 
-    auto const addVerse =
-            [&tree,&settings](QString const & translation)
-    { tree.emplace_back(translation, settings); };
+    tree.append( new CTextRendering::KeyTreeItem(
+                     QString(tr("<div class=\"sectiontitle\">CHAPTER 3</div><div></div>")),
+                     settings));
 
-    addVerse(tr("<div class=\"sectiontitle\">CHAPTER 3</div><div></div>"));
+    tree.append( new CTextRendering::KeyTreeItem(
+                     QString(tr("<div  xml:lang=\"en\" lang=\"en\" class=\"sectiontitle\">The New Birth </div>")),
+                     settings));
 
-    addVerse(tr("<div  xml:lang=\"en\" lang=\"en\" class=\"sectiontitle\">The New Birth </div>"));
-
-    addVerse(QString("\n<span class=\"entryname\"><a name=\"crossref\" href=\"sword://Bible/WEB/John 3:1\">1 </a></span>%1")
-             .arg(tr(
+    tree.append( new CTextRendering::KeyTreeItem(
+                     QString("\n<span class=\"entryname\"><a name=\"crossref\" href=\"sword://Bible/WEB/John 3:1\">1 </a></span>%1")
+                     .arg(tr(
 "<span lemma=\"G1161\">Now</span> <span lemma=\"G444\">there was a man</span>"
 "<span lemma=\"G5330\"> of the Pharisees</span>, <span lemma=\"G3686\">named</span> "
 "<span class=\"crossreference\">"
@@ -232,11 +237,12 @@ void CDisplaySettingsPage::updateStylePreview() {
 "<a href=\"sword://Bible/NASB/John 7:26; \" name=crossref> John 7:26</a>,"
 "<a href=\"sword://Bible/NASB/John 7:48; \" name=crossref>48</a></span> <span lemma=\"G758\">ruler</span>"
 "<span lemma=\"G2453\"> of the Jews</span>;"
-            )));
+                    )), settings));
 
-    addVerse(QString("\n<span class=\"entryname\"><a name=\"crossref\" href=\"sword://Bible/WEB/John 3:1\">2 </a></span>%1")
-             .arg(tr(
-"<span lemma=\"G3778\">this </span>"
+    tree.append( new CTextRendering::KeyTreeItem(
+                     QString("\n<span class=\"entryname\"><a name=\"crossref\" href=\"sword://Bible/WEB/John 3:1\">2 </a></span>%1")
+                     .arg(tr(
+                              "<span lemma=\"G3778\">this </span>"
 "<span lemma=\"G3778\">man </span>"
 "<span lemma=\"G2064\">came </span>"
 "<span lemma=\"G3571\">to Jesus by night </span>"
@@ -265,10 +271,12 @@ void CDisplaySettingsPage::updateStylePreview() {
 "<a href=\"sword://Bible/NASB/Acts 2:22; \" name=crossref>Acts 2:22</a>;"
 "<a href=\"sword://Bible/NASB/Acts 10:38; \" name=crossref>10:38</a></span>"
 "<span lemma=\"G2316\"> God</span> is with him.\""
-)));
+                    )), settings));
 
-    addVerse(QString("\n<span class=\"entryname\"><a name=\"crossref\" href=\"sword://Bible/WEB/John 3:1\">3 </a></span>%1")
-             .arg(tr(
+
+    tree.append( new CTextRendering::KeyTreeItem(
+                     QString("\n<span class=\"entryname\"><a name=\"crossref\" href=\"sword://Bible/WEB/John 3:1\">3 </a></span>%1")
+                     .arg(tr(
 "<span lemma=\"G2424\">Jesus answered and said to him</span>,"
 "<span class=\"jesuswords\">\"Truly, truly, I say to you, unless one  "
 "<span class=\"crossreference\">"
@@ -290,7 +298,7 @@ void CDisplaySettingsPage::updateStylePreview() {
 "<span lemma=\"G932\">the kingdom </span> "
 "<span lemma=\"G2316\">of God </span>.\""
 "</span>"
-)));
+                    )), settings));
 
     /// \todo Remove the following hack:
     const QString oldStyleName = CDisplayTemplateMgr::activeTemplateName();
@@ -305,7 +313,7 @@ void CDisplaySettingsPage::updateStylePreview() {
     btConfig().setValue("GUI/activeTemplateName", oldStyleName);
 }
 
-void CDisplaySettingsPage::save() const {
+void CDisplaySettingsPage::save() {
     btConfig().setValue("GUI/showSplashScreen", m_showLogoCheck->isChecked() );
     btConfig().setValue("GUI/activeTemplateName", m_styleChooserCombo->currentText());
     btConfig().setValue("GUI/booknameLanguage", m_swordLocaleCombo->itemData(m_swordLocaleCombo->currentIndex()));

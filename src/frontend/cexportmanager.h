@@ -2,27 +2,27 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CEXPORTMANAGER_H
+#define CEXPORTMANAGER_H
 
 #include <memory>
 #include <QList>
 #include <QString>
 #include "../backend/btglobal.h"
 #include "../backend/config/btconfig.h"
-#include "../backend/cswordmodulesearch.h"
-#include "../backend/drivers/btmodulelist.h"
 
 
 class CSwordKey;
 class CSwordModuleInfo;
+class ListKey;
 class QProgressDialog;
 namespace Rendering {
 class CTextRendering;
@@ -51,7 +51,7 @@ public: /* Methods: */
                  bool const addText,
                  const BtConstModuleList& modules);
 
-    bool saveKeyList(CSwordModuleSearch::ModuleResultList const & list,
+    bool saveKeyList(sword::ListKey const & list,
                      CSwordModuleInfo const * const module,
                      Format const format,
                      bool const addText);
@@ -64,21 +64,21 @@ public: /* Methods: */
                  Format const format,
                  bool const addText);
 
-    bool pipeKeyList(CSwordModuleSearch::ModuleResultList const & list,
+    bool copyKeyList(sword::ListKey const & list,
                      CSwordModuleInfo const * const module,
                      Format const format,
                      bool const addText);
 
-    bool copyKeyList(CSwordModuleSearch::ModuleResultList const & list,
+    bool copyKeyList(QList<CSwordKey *> const & list,
+                     Format const format,
+                     bool const addText);
+
+    bool pipeKeyList(sword::ListKey const & list,
                      CSwordModuleInfo const * const module,
                      Format const format,
                      bool const addText);
 
     bool pipeKeyList(QList<CSwordKey *> const & list,
-                     Format const format,
-                     bool const addText);
-
-    bool copyKeyList(QList<CSwordKey *> const & list,
                      Format const format,
                      bool const addText);
 
@@ -99,7 +99,7 @@ public: /* Methods: */
                           DisplayOptions const & displayOptions,
                           FilterOptions const & filterOptions);
 
-    bool printKeyList(CSwordModuleSearch::ModuleResultList const & list,
+    bool printKeyList(sword::ListKey const & list,
                       CSwordModuleInfo const * const module,
                       DisplayOptions const & displayOptions,
                       FilterOptions const & filterOptions);
@@ -138,3 +138,5 @@ private: /* Fields: */
     QProgressDialog * m_progressDialog;
 
 };
+
+#endif

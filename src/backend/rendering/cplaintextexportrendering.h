@@ -2,18 +2,19 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef RENDERINGCPLAINTEXTEXPORTRENDERING_H
+#define RENDERINGCPLAINTEXTEXPORTRENDERING_H
 
 #include "../config/btconfig.h"
-#include "ctextrendering.h"
+#include "chtmlexportrendering.h"
 
 
 namespace Rendering {
@@ -23,7 +24,7 @@ namespace Rendering {
  * @short Text rendering as plain text.
  * @author The BibleTime team
  */
-class CPlainTextExportRendering: public CTextRendering {
+class CPlainTextExportRendering: public CHTMLExportRendering {
 
     public: /* Methods: */
 
@@ -40,3 +41,5 @@ class CPlainTextExportRendering: public CTextRendering {
 }; /* class CPlainTextExportRendering */
 
 } /* namespace Rendering */
+
+#endif

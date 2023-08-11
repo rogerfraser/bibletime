@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -12,32 +12,22 @@
 
 #include "btconfig.h"
 
-#include <QLocale>
-#include <QSettings>
-#include <memory>
+#include <QDebug>
 #include <utility>
+#include "../../util/btassert.h"
 #include "../../util/directory.h" // DU::getUserBaseDir()
+#include "../managers/cdisplaytemplatemgr.h"
 #include "../managers/cswordbackend.h"
 
-
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wextra-semi"
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
-#include <listkey.h>
 #include <versekey.h> // For search scope configuration
-#pragma GCC diagnostic pop
 
 
 #define BTCONFIG_API_VERSION 1
 namespace {
 const QString BTCONFIG_API_VERSION_KEY = "btconfig_api_version";
-QString const GROUP_SESSIONS = "sessions";
-QString const GROUP_SESSIONS_PREFIX = GROUP_SESSIONS + '/';
-QString const KEY_CURRENT_SESSION = "sessions/currentSession";
-QString const KEY_SESSION_NAME = "sessions/%1/name";
-} // anonymous namespace
+}
+
 
 /*
  * set the instance variable initially to 0, so it can be safely checked
@@ -49,21 +39,20 @@ BtConfig::StringMap BtConfig::m_defaultSearchScopes;
 
 
 BtConfig::BtConfig(const QString & settingsFile)
-    : BtConfigCore(
-          std::make_shared<QSettings>(settingsFile, QSettings::IniFormat))
+    : BtConfigCore(settingsFile)
 {
     BT_ASSERT(!m_instance && "BtConfig already initialized!");
     m_instance = this;
 
     if (m_defaultSearchScopes.isEmpty()) {
-        m_defaultSearchScopes.insert(tr("Old testament"),          QString("Gen - Mal"));
-        m_defaultSearchScopes.insert(tr("Moses/Pentateuch/Torah"), QString("Gen - Deut"));
-        m_defaultSearchScopes.insert(tr("History"),                QString("Jos - Est"));
-        m_defaultSearchScopes.insert(tr("Prophets"),               QString("Isa - Mal"));
-        m_defaultSearchScopes.insert(tr("New testament"),          QString("Mat - Rev"));
-        m_defaultSearchScopes.insert(tr("Gospels"),                QString("Mat - Joh"));
-        m_defaultSearchScopes.insert(tr("Letters/Epistles"),       QString("Rom - Jude"));
-        m_defaultSearchScopes.insert(tr("Paul's Epistles"),        QString("Rom - Phile"));
+        m_defaultSearchScopes.insert(QT_TR_NOOP("Old testament"),          QString("Gen - Mal"));
+        m_defaultSearchScopes.insert(QT_TR_NOOP("Moses/Pentateuch/Torah"), QString("Gen - Deut"));
+        m_defaultSearchScopes.insert(QT_TR_NOOP("History"),                QString("Jos - Est"));
+        m_defaultSearchScopes.insert(QT_TR_NOOP("Prophets"),               QString("Isa - Mal"));
+        m_defaultSearchScopes.insert(QT_TR_NOOP("New testament"),          QString("Mat - Rev"));
+        m_defaultSearchScopes.insert(QT_TR_NOOP("Gospels"),                QString("Mat - Joh"));
+        m_defaultSearchScopes.insert(QT_TR_NOOP("Letters/Epistles"),       QString("Rom - Jude"));
+        m_defaultSearchScopes.insert(QT_TR_NOOP("Paul's Epistles"),        QString("Rom - Phile"));
     }
 
 #ifdef Q_OS_WIN
@@ -72,40 +61,6 @@ BtConfig::BtConfig(const QString & settingsFile)
     if (pointSize < minPointSize)
         m_defaultFont.setPointSizeF(minPointSize);
 #endif
-
-    // Read all session keys and names:
-    auto sessionsConf = group(GROUP_SESSIONS);
-    for (auto && sessionKey : sessionsConf.childGroups()) {
-        // Skip empty//keys just in case:
-        if (sessionKey.isEmpty())
-            continue;
-
-        auto sessionName =
-                sessionsConf.value<QString>(sessionKey + "/name");
-        if (!sessionName.isEmpty())
-            m_sessionNames.insert(std::move(sessionKey),
-                                  std::move(sessionName));
-    }
-
-    // Get current session key:
-    m_currentSessionKey = value<QString>(KEY_CURRENT_SESSION);
-
-    /*
-      If no session with the current session key exists, default to the first
-      session found. If no sessions were found, create a default session.
-    */
-    if (m_currentSessionKey.isEmpty()
-        || !m_sessionNames.contains(m_currentSessionKey))
-    {
-        if (m_sessionNames.isEmpty()) {
-            m_currentSessionKey = QString::number(0, 36);
-            setValue(KEY_CURRENT_SESSION, m_currentSessionKey);
-            setValue(KEY_SESSION_NAME.arg(m_currentSessionKey),
-                     tr("Default Session"));
-        } else {
-            m_currentSessionKey = m_sessionNames.keys().first();
-        }
-    }
 }
 
 BtConfig::InitState BtConfig::initBtConfig() {
@@ -136,53 +91,6 @@ BtConfig& BtConfig::getInstance() {
     return *m_instance;
 }
 
-void BtConfig::setCurrentSession(QString const & key) {
-    BT_ASSERT(!key.isEmpty());
-    BT_ASSERT(m_sessionNames.contains(key));
-    m_currentSessionKey = key;
-
-    setValue(KEY_CURRENT_SESSION, key);
-}
-
-QString BtConfig::addSession(QString const & name) {
-    BT_ASSERT(!name.isEmpty());
-
-    // Generate a new session key:
-    QString key = QString::number(0u, 36);
-    if (m_sessionNames.contains(key)) {
-        QString keyPrefix;
-        std::size_t i = 1u;
-        for (;;) {
-            key = QString::number(i, 36);
-            if (!m_sessionNames.contains(keyPrefix + key))
-                break;
-            if (i == std::numeric_limits<std::size_t>::max()) {
-                i = 0u;
-                keyPrefix.append('_');
-            } else {
-                i++;
-            }
-        };
-    }
-    BT_ASSERT(!m_sessionNames.contains(key));
-    m_sessionNames.insert(key, name);
-
-    setValue(KEY_SESSION_NAME.arg(key), name);
-    return key;
-}
-
-
-void BtConfig::deleteSession(QString const & key) {
-    BT_ASSERT(m_sessionNames.contains(key));
-    BT_ASSERT(key != m_currentSessionKey);
-    m_sessionNames.remove(key);
-
-    remove(GROUP_SESSIONS_PREFIX + key);
-}
-
-BtConfigCore BtConfig::session() const
-{ return group(GROUP_SESSIONS_PREFIX + m_currentSessionKey); }
-
 void BtConfig::destroyInstance() {
     delete m_instance;
     m_instance = nullptr;
@@ -201,126 +109,129 @@ QString BtConfig::getModuleEncryptionKey(const QString & name) {
 }
 
 BtConfig::ShortcutsMap BtConfig::getShortcuts(QString const & shortcutGroup) {
-    ShortcutsMap allShortcuts;
-    auto shortcutsConf = group(shortcutGroup);
-    for (QString const & key : shortcutsConf.childKeys()) {
-        auto const variant = shortcutsConf.qVariantValue(key);
+    beginGroup(shortcutGroup);
+        ShortcutsMap allShortcuts;
+        for (QString const & key : childKeys()) {
+            QVariant variant = qVariantValue(key);
 
-        QList<QKeySequence> shortcuts;
+            QList<QKeySequence> shortcuts;
 
-        if (variant.type() == QVariant::List) { // For BibleTime before 2.9
-            for (QVariant const & shortcut : variant.toList())
-                shortcuts.append(shortcut.toString());
-        } else if (variant.type() == QVariant::StringList
-                   || variant.type() == QVariant::String)
-        { // a StringList with one element is recognized as a QVariant::String
-            for (QString const & shortcut : variant.toStringList())
-                shortcuts.append(shortcut);
-        } else { // it's something we don't know, skip it
-            continue;
+            if (variant.type() == QVariant::List) { // For BibleTime before 2.9
+                for (QVariant const & shortcut : variant.toList())
+                    shortcuts.append(shortcut.toString());
+            } else if (variant.type() == QVariant::StringList
+                       || variant.type() == QVariant::String)
+            { // a StringList with one element is recognized as a QVariant::String
+                for (QString const & shortcut : variant.toStringList())
+                    shortcuts.append(shortcut);
+            } else { // it's something we don't know, skip it
+                continue;
+            }
+
+            allShortcuts.insert(key, shortcuts);
         }
-
-        allShortcuts.insert(key, shortcuts);
-    }
+    endGroup();
     return allShortcuts;
 }
 
 void BtConfig::setShortcuts(QString const & shortcutGroup,
                             ShortcutsMap const  & shortcuts)
 {
-    auto shortcutsConf = group(shortcutGroup);
-    for (auto it = shortcuts.begin(); it != shortcuts.end(); ++it) {
-        // Write beautiful string lists (since 2.9):
-        /// \note saving QKeySequences directly doesn't appear to work!
-        QStringList varList;
-        for (QKeySequence const & shortcut : it.value())
-            varList.append(shortcut.toString());
+    beginGroup(shortcutGroup);
+        for (auto it = shortcuts.begin(); it != shortcuts.end(); ++it) {
+            // Write beautiful string lists (since 2.9):
+            /// \note saving QKeySequences directly doesn't appear to work!
+            QStringList varList;
+            for (QKeySequence const & shortcut : it.value())
+                varList.append(shortcut.toString());
 
-        if (!varList.empty())
-            shortcutsConf.setValue(it.key(), varList);
-    }
+            if (!varList.empty())
+                setValue(it.key(), varList);
+        }
+    endGroup();
 }
 
-FilterOptions BtConfig::loadFilterOptionsFromGroup(BtConfigCore const & group) {
+FilterOptions BtConfig::getFilterOptions() {
     FilterOptions os;
-    auto const subConf = group.group("presentation");
-    os.footnotes           = subConf.value<bool>("footnotes", true);
-    os.strongNumbers       = subConf.value<bool>("strongNumbers", true);
-    os.headings            = subConf.value<bool>("headings", true);
-    os.morphTags           = subConf.value<bool>("morphTags", true);
-    os.lemmas              = subConf.value<bool>("lemmas", true);
-    os.redLetterWords      = subConf.value<bool>("redLetterWords", true);
-    os.hebrewPoints        = subConf.value<bool>("hebrewPoints", true);
-    os.hebrewCantillation  = subConf.value<bool>("hebrewCantillation", true);
-    os.greekAccents        = subConf.value<bool>("greekAccents", true);
-    os.textualVariants     = subConf.value<bool>("textualVariants", false);
-    os.scriptureReferences = subConf.value<bool>("scriptureReferences", true);
-    os.morphSegmentation   = subConf.value<bool>("morphSegmentation", true);
+    beginGroup("presentation");
+    os.footnotes           = sessionValue<bool>("footnotes", true);
+    os.strongNumbers       = sessionValue<bool>("strongNumbers", true);
+    os.headings            = sessionValue<bool>("headings", true);
+    os.morphTags           = sessionValue<bool>("morphTags", true);
+    os.lemmas              = sessionValue<bool>("lemmas", true);
+    os.redLetterWords      = sessionValue<bool>("redLetterWords", true);
+    os.hebrewPoints        = sessionValue<bool>("hebrewPoints", true);
+    os.hebrewCantillation  = sessionValue<bool>("hebrewCantillation", true);
+    os.greekAccents        = sessionValue<bool>("greekAccents", true);
+    os.textualVariants     = sessionValue<bool>("textualVariants", false);
+    os.scriptureReferences = sessionValue<bool>("scriptureReferences", true);
+    os.morphSegmentation   = sessionValue<bool>("morphSegmentation", true);
+    endGroup();
     return os;
 }
 
-void BtConfig::storeFilterOptionsToGroup(FilterOptions const & os,
-                                         BtConfigCore & group)
-{
-    auto subConf = group.group("presentation");
-    subConf.setValue("footnotes", static_cast<bool>(os.footnotes));
-    subConf.setValue("strongNumbers", static_cast<bool>(os.strongNumbers));
-    subConf.setValue("headings", static_cast<bool>(os.headings));
-    subConf.setValue("morphTags", static_cast<bool>(os.morphTags));
-    subConf.setValue("lemmas", static_cast<bool>(os.lemmas));
-    subConf.setValue("redLetterWords", static_cast<bool>(os.redLetterWords));
-    subConf.setValue("hebrewPoints", static_cast<bool>(os.hebrewPoints));
-    subConf.setValue("hebrewCantillation", static_cast<bool>(os.hebrewCantillation));
-    subConf.setValue("greekAccents", static_cast<bool>(os.greekAccents));
-    subConf.setValue("textualVariants", static_cast<bool>(os.textualVariants));
-    subConf.setValue("scriptureReferences", static_cast<bool>(os.scriptureReferences));
-    subConf.setValue("morphSegmentation", static_cast<bool>(os.morphSegmentation));
+void BtConfig::setFilterOptions(const FilterOptions & os) {
+    beginGroup("presentation");
+    setSessionValue("footnotes", static_cast<bool>(os.footnotes));
+    setSessionValue("strongNumbers", static_cast<bool>(os.strongNumbers));
+    setSessionValue("headings", static_cast<bool>(os.headings));
+    setSessionValue("morphTags", static_cast<bool>(os.morphTags));
+    setSessionValue("lemmas", static_cast<bool>(os.lemmas));
+    setSessionValue("redLetterWords", static_cast<bool>(os.redLetterWords));
+    setSessionValue("hebrewPoints", static_cast<bool>(os.hebrewPoints));
+    setSessionValue("hebrewCantillation", static_cast<bool>(os.hebrewCantillation));
+    setSessionValue("greekAccents", static_cast<bool>(os.greekAccents));
+    setSessionValue("textualVariants", static_cast<bool>(os.textualVariants));
+    setSessionValue("scriptureReferences", static_cast<bool>(os.scriptureReferences));
+    setSessionValue("morphSegmentation", static_cast<bool>(os.morphSegmentation));
+    endGroup();
 }
 
-DisplayOptions
-BtConfig::loadDisplayOptionsFromGroup(BtConfigCore const & group) {
+DisplayOptions BtConfig::getDisplayOptions() {
     DisplayOptions os;
-    auto const subConf = group.group("presentation");
-    os.lineBreaks   = subConf.value<bool>("lineBreaks", false);
-    os.verseNumbers = subConf.value<bool>("verseNumbers", true);
+    beginGroup("presentation");
+    os.lineBreaks   = sessionValue<bool>("lineBreaks", false);
+    os.verseNumbers = sessionValue<bool>("verseNumbers", true);
+    endGroup();
     return os;
 }
 
-void BtConfig::storeDisplayOptionsToGroup(DisplayOptions const & os,
-                                          BtConfigCore & group)
-{
-    auto subConf = group.group("presentation");
-    subConf.setValue("lineBreaks", static_cast<bool>(os.lineBreaks));
-    subConf.setValue("verseNumbers", static_cast<bool>(os.verseNumbers));
+void BtConfig::setDisplayOptions(const DisplayOptions & os) {
+    beginGroup("presentation");
+    setSessionValue("lineBreaks", static_cast<bool>(os.lineBreaks));
+    setSessionValue("verseNumbers", static_cast<bool>(os.verseNumbers));
+    endGroup();
 }
 
-void BtConfig::setFontForLanguage(Language const & language,
-                                  FontSettingsPair const & fontSettings)
+void BtConfig::setFontForLanguage(const CLanguageMgr::Language & language,
+                                  const FontSettingsPair & fontSettings)
 {
     auto fontAsString = fontSettings.second.toString();
 
     const QString & englishName = language.englishName();
     BT_ASSERT(!englishName.isEmpty());
+    auto const & abbrev = language.abbrev();
+    BT_ASSERT(!abbrev.isEmpty());
 
+    QMutexLocker lock(&this->m_mutex);
     // write the language to the settings
     setValue("fonts/" + englishName, fontAsString);
     setValue("font standard settings/" + englishName, fontSettings.first);
-
-    auto const & abbrev = language.abbrev();
-    BT_ASSERT(!abbrev.isEmpty());
 
     // (over-)write the language to the settings using abbreviation:
     setValue("fonts/" + abbrev, std::move(fontAsString));
     setValue("font standard settings/" + abbrev, fontSettings.first);
 
-    // Update cache:
-    m_fontCache[&language] = fontSettings;
+    // Remove language from the cache:
+    m_fontCache.remove(&language);
 }
 
-BtConfig::FontSettingsPair
-BtConfig::getFontForLanguage(Language const & language) {
+BtConfig::FontSettingsPair BtConfig::getFontForLanguage(
+        const CLanguageMgr::Language & language)
+{
+    QMutexLocker lock(&this->m_mutex);
     // Check the cache first:
-    auto it(m_fontCache.find(&language));
+    FontCacheMap::const_iterator it(m_fontCache.find(&language));
     if (it != m_fontCache.end())
         return *it;
 
@@ -332,9 +243,8 @@ BtConfig::getFontForLanguage(Language const & language) {
     auto const & abbrev = language.abbrev();
     BT_ASSERT(!abbrev.isEmpty());
 
-    if (auto const v = qVariantValue("font standard settings/" + abbrev);
-        v.canConvert<bool>())
-    {
+    auto v = qVariantValue("font standard settings/" + abbrev);
+    if (v.canConvert<bool>()) {
         fontSettings.first = v.value<bool>();
     } else {
         fontSettings.first =
@@ -343,7 +253,7 @@ BtConfig::getFontForLanguage(Language const & language) {
 
     QFont font;
     if (fontSettings.first) {
-        auto const v = qVariantValue("fonts/" + abbrev);
+        v = qVariantValue("fonts/" + abbrev);
         auto fontName =
                 v.canConvert<QString>()
                 ? v.value<QString>()
@@ -364,10 +274,23 @@ BtConfig::getFontForLanguage(Language const & language) {
 }
 
 BtConfig::StringMap BtConfig::getSearchScopesForCurrentLocale(const QStringList& scopeModules) {
-    StringMap map = value<BtConfig::StringMap>("properties/searchScopes", m_defaultSearchScopes);
+    auto const storedMap = value<BtConfig::StringMap>("properties/searchScopes",
+                                                      m_defaultSearchScopes);
+    StringMap map;
+
+    // Apply translation for default search scope names:
+    for (auto it = storedMap.cbegin(); it != storedMap.cend(); ++it) {
+        if (m_defaultSearchScopes.contains(it.key())) {
+            map.insert(tr(it.key().toUtf8()), it.value());
+        } else {
+            map.insert(it.key(), it.value());
+        }
+    }
+
 
     // Convert map to current locale:
-    for (auto & data : map) {
+    for (StringMap::Iterator it = map.begin(); it != map.end(); it++) {
+        QString &data = it.value();
         sword::ListKey list = parseVerseListWithModules(data, scopeModules);
         data.clear();
         for (int i = 0; i < list.getCount(); i++) {
@@ -383,7 +306,7 @@ void BtConfig::setSearchScopesWithCurrentLocale(const QStringList& scopeModules,
      * We want to make sure that the search scopes are saved with english
      * key names so loading them will always work with each locale set.
      */
-    auto iter(searchScopes.begin());
+    BtConfig::StringMap::Iterator iter = searchScopes.begin();
     while (iter != searchScopes.end()) {
         QString &data = iter.value();
         bool parsingWorked = true;
@@ -410,21 +333,9 @@ void BtConfig::setSearchScopesWithCurrentLocale(const QStringList& scopeModules,
     setValue("properties/searchScopes", searchScopes);
 }
 
-QString BtConfig::booknameLanguage() {
-    static QString const key("GUI/booknameLanguage");
-    auto r = value<QString>(key, QLocale().name());
-
-    // Maintain backwards compatibility with BibleTime versions older than 3.1:
-    bool const updateConfig = r.contains('_');
-    r.replace('_', '-'); // BCP 47
-    if (updateConfig)
-        setValue(key, r);
-
-    return r;
-}
-
 sword::ListKey BtConfig::parseVerseListWithModules(const QString& data, const QStringList& scopeModules) {
-    for (auto const & moduleName : scopeModules) {
+
+    Q_FOREACH(QString moduleName, scopeModules) {
         auto module = CSwordBackend::instance()->findModuleByName(moduleName);
         if (module == nullptr)
             continue;

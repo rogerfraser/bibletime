@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CDISPLAYTEMPLATEMGR_H
+#define CDISPLAYTEMPLATEMGR_H
 
 #include <QHash>
 #include <QStringList>
@@ -32,11 +33,11 @@ class CDisplayTemplateMgr {
         */
         struct Settings {
 
-            Settings()
+            inline Settings()
                 : langAbbrev("en")
                 , textDirection(CSwordModuleInfo::LeftToRight) {}
 
-            char const * textDirectionAsHtmlDirAttr() const {
+            inline const char * textDirectionAsHtmlDirAttr() const {
                 return textDirection == CSwordModuleInfo::LeftToRight ? "ltr" : "rtl";
             }
 
@@ -68,8 +69,9 @@ class CDisplayTemplateMgr {
         /**
           \returns the list of available templates.
         */
-        QStringList const & availableTemplates() const
-        { return m_availableTemplateNamesCache; }
+        inline const QStringList & availableTemplates() const {
+            return m_availableTemplateNamesCache;
+        }
 
         /**
           \brief Fills the template.
@@ -90,7 +92,7 @@ class CDisplayTemplateMgr {
         /**
           \returns the name of the default template.
         */
-        static char const * defaultTemplateName() { return "Blue.css"; }
+        static inline const char * defaultTemplateName() { return "Blue.css"; }
 
         /**
           \returns the name of the active template.
@@ -100,7 +102,7 @@ class CDisplayTemplateMgr {
         /**
           \returns The singleton instance of the instance of this class.
         */
-        static CDisplayTemplateMgr * instance() {
+        static inline CDisplayTemplateMgr * instance() {
             BT_ASSERT(m_instance);
             return m_instance;
         }
@@ -126,3 +128,5 @@ class CDisplayTemplateMgr {
         QStringList m_availableTemplateNamesCache;
 
 };
+
+#endif

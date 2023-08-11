@@ -2,22 +2,21 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTBOOKSHELFWORKSPAGE
+#define BTBOOKSHELFWORKSPAGE
 
 #include "btbookshelfwizardpage.h"
 
-#include <memory>
 #include "../../backend/bookshelfmodel/btbookshelftreemodel.h"
 #include "../../backend/drivers/btmoduleset.h"
-#include "../../backend/managers/cswordbackend.h"
 #include "btbookshelfwizardenums.h"
 
 
@@ -45,7 +44,7 @@ public: /* Methods: */
     QString installPath() const;
     int nextId() const final override;
 
-private Q_SLOTS:
+private slots:
 
     void slotGroupingActionTriggered(
             BtBookshelfTreeModel::Grouping const & grouping);
@@ -73,11 +72,12 @@ private: /* Fields: */
     QLineEdit * m_nameFilterEdit;
 
     BtInstallPageModel * m_installPageModel;
-    std::vector<std::unique_ptr<CSwordBackend const>> m_usedBackends;
-    std::shared_ptr<BtBookshelfModel> m_bookshelfModel;
+    BtBookshelfModel * m_bookshelfModel;
 
     QMenu * m_contextMenu;
     BtBookshelfGroupingMenu * m_groupingMenu;
     QMenu * m_itemContextMenu;
 
 }; /* class BtBookshelfWorksPage */
+
+#endif

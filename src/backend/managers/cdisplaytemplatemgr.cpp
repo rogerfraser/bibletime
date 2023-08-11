@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -17,11 +17,10 @@
 #include <QFileInfo>
 #include <QStringList>
 #include <QTextStream>
-#include "../../util/btassert.h"
 #include "../../util/directory.h"
 #include "../config/btconfig.h"
 #include "../drivers/cswordmoduleinfo.h"
-#include "cswordbackend.h"
+#include "clanguagemgr.h"
 
 
 #define CSSTEMPLATEBASE "Basic.tmpl"
@@ -52,10 +51,10 @@ CDisplayTemplateMgr::CDisplayTemplateMgr(QString & errorMessage) :
         {
             const QStringList filter("*.tmpl");
             // Preload global display templates from disk:
-            for (auto const & file : td.entryList(filter, readableFileFilter))
+            Q_FOREACH(const QString & file, td.entryList(filter, readableFileFilter))
                 loadTemplate(td.canonicalPath() + "/" + file);
             // Preload user display templates from disk:
-            for (auto const & file : utd.entryList(filter, readableFileFilter))
+            Q_FOREACH(const QString & file, utd.entryList(filter, readableFileFilter))
                 loadTemplate(utd.canonicalPath() + "/" + file);
         }
 
@@ -68,10 +67,10 @@ CDisplayTemplateMgr::CDisplayTemplateMgr(QString & errorMessage) :
         {
             const QStringList cssfilter("*.css");
             // Load global app stylesheets
-            for (auto const & file : td.entryList(cssfilter, readableFileFilter))
+            Q_FOREACH(const QString & file, td.entryList(cssfilter, readableFileFilter))
                 loadCSSTemplate(td.canonicalPath() + "/" + file);
             // Load user app stylesheets
-            for (auto const & file : utd.entryList(cssfilter, readableFileFilter))
+            Q_FOREACH(const QString & file, utd.entryList(cssfilter, readableFileFilter))
                 loadCSSTemplate(utd.canonicalPath() + "/" + file);
         }
     }
@@ -144,7 +143,7 @@ QString CDisplayTemplateMgr::fillTemplate(const QString & name,
         // qDebug() << "There were more than 1 module, create headers";
         QString header;
 
-        for (auto const * const mi : settings.modules) {
+        Q_FOREACH(const CSwordModuleInfo * const mi, settings.modules) {
             header.append("<th style=\"width:")
             .append(QString::number(static_cast<int>(100.0 / moduleCount)))
             .append("%;\">")
@@ -169,10 +168,8 @@ QString CDisplayTemplateMgr::fillTemplate(const QString & name,
                .append('}');
     }
     {
-        auto const availableLanguages =
-                CSwordBackend::instance()->availableLanguages();
-        BT_ASSERT(availableLanguages);
-        for (auto const & lang : *availableLanguages) {
+        const CLanguageMgr::LangMap & langMap = CLanguageMgr::instance()->availableLanguages();
+        Q_FOREACH(const CLanguageMgr::Language * const lang, langMap) {
             if (lang->abbrev().isEmpty())
                 continue;
 

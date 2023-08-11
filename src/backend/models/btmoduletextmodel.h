@@ -2,17 +2,17 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTMODULETEXTMODEL_H
+#define BTMODULETEXTMODEL_H
 
-#include <optional>
 #include <QAbstractListModel>
 #include <QColor>
 #include <QStringList>
@@ -23,10 +23,12 @@
 #include "../keys/cswordldkey.h"
 
 
-class CSwordModuleInfo;
-
 /** For the BtFindWidget buttons (previous, next) */
 struct FindState {
+
+    // Prev/Next word highlighting enabled
+    bool enabled;
+
     // Model row for item with highlight
     int index;
 
@@ -113,14 +115,10 @@ public:
     int indexToVerse(int index) const;
 
     /** Convert index(row) into CSwordVerseKey. */
-    CSwordVerseKey indexToVerseKey(int index,
-                                   CSwordModuleInfo const & module) const;
-
-    /** Convert index(row) into CSwordVerseKey. */
     CSwordKey* indexToKey(int index, int moduleNum) const;
 
     /** Convert CSwordKey into index. */
-    int keyToIndex(CSwordKey const & key) const;
+    int keyToIndex(const CSwordKey* key) const;
 
     /** Convert CSwordVerseKey into index(row). */
     int verseKeyToIndex(const CSwordVerseKey& key) const;
@@ -148,7 +146,7 @@ public:
     void setDisplayOptions(const DisplayOptions & displayOptions);
 
     /** Set the state of the currently found word functionality */
-    void setFindState(std::optional<FindState> findState);
+    void setFindState(const FindState& findState);
 
     /** Set the color of word that are highlighted */
     void setHighlightWords(const QString& highlightWords, bool caseSensitive);
@@ -176,6 +174,7 @@ private:
 
     CSwordTreeKey indexToBookKey(int index) const;
 
+    QString highlightFindPreviousNextField(const QString& text) const;
     bool isBible() const;
     bool isBook() const;
     bool isCommentary() const;
@@ -197,5 +196,7 @@ private:
     BtModuleTextFilter * m_textFilter;
     DisplayOptions m_displayOptions;
     FilterOptions m_filterOptions;
-    std::optional<FindState> m_findState;
+    FindState m_findState;
 };
+
+#endif

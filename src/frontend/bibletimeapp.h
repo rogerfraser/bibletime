@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BIBLETIMEAPP_H
+#define BIBLETIMEAPP_H
 
 #include <QApplication>
 
@@ -30,16 +31,17 @@ class BibleTimeApp : public QApplication {
         BibleTimeApp(int &argc, char **argv);
         ~BibleTimeApp();
 
-        void startInit() { m_init = true; }
+        inline void startInit(bool const debugMode = false) {
+            m_init = true;
+            m_debugMode = debugMode;
+        }
 
         bool initBtConfig();
         void initColorManager();
         bool initDisplayTemplateManager();
         void initIcons();
 
-        bool debugMode() const noexcept { return m_debugMode; }
-        void setDebugMode(bool const debugMode) noexcept
-        { m_debugMode = debugMode; }
+        bool debugMode() const { return m_debugMode; }
 
     private: /* Fields: */
 
@@ -50,3 +52,5 @@ class BibleTimeApp : public QApplication {
 };
 
 #define btApp (static_cast<BibleTimeApp *>(BibleTimeApp::instance()))
+
+#endif

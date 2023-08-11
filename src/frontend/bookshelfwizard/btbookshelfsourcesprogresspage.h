@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTBOOKSHELFSOURCESPROGRESSPAGE
+#define BTBOOKSHELFSOURCESPROGRESSPAGE
 
 #include "btbookshelfwizardpage.h"
 
@@ -26,8 +27,9 @@ class BtBookshelfSourcesProgressPage final: public BtBookshelfWizardPage {
 
 public: /* Methods: */
 
-    BtBookshelfSourcesProgressPage(QWidget * parent = nullptr);
-    ~BtBookshelfSourcesProgressPage() noexcept override { destroyThread(); }
+    BtBookshelfSourcesProgressPage(QWidget * parent = 0);
+    inline ~BtBookshelfSourcesProgressPage() noexcept override
+    { destroyThread(); }
 
     void destroyThread() noexcept;
 
@@ -35,10 +37,10 @@ public: /* Methods: */
     bool isComplete() const final override;
     int nextId() const final override;
 
-public Q_SLOTS:
+public slots:
     void slotStopInstall();
 
-private Q_SLOTS:
+private slots:
 
     void slotThreadFinished();
 
@@ -55,3 +57,5 @@ private: /* Methods: */
     BtSourcesThread * m_thread = nullptr;
 
 };
+
+#endif

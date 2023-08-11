@@ -2,22 +2,26 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTCONFIGDIALOG_H
+#define BTCONFIGDIALOG_H
 
 #include <QDialog>
 
+#include <QIcon>
+#include <QListWidgetItem>
 
-class QListWidget;
-class QListWidgetItem;
+
+class QDialogButtonBox;
 class QStackedWidget;
+class QVBoxLayout;
 
 /**
 * Base class for configuration dialogs. A dialog which has a page chooser (icons
@@ -29,8 +33,6 @@ class QStackedWidget;
 */
 class BtConfigDialog : public QDialog {
 
-    Q_OBJECT
-
 public: /* Types: */
 
     /** Base class for configuration dialog pages. */
@@ -40,17 +42,30 @@ public: /* Types: */
 
     public: /* Methods: */
 
-        Page(QIcon const & icon, QWidget * const parent = nullptr);
-        ~Page() noexcept;
+        inline Page(QIcon const & icon, QWidget * const parent)
+            : QWidget(parent)
+            , m_icon(icon)
+        {}
 
-        void setHeaderText(QString const & headerText);
+        inline void setHeaderText(QString const & headerText) {
+            m_headerText = headerText;
+            if (m_listWidgetItem)
+                m_listWidgetItem->setText(headerText);
+        }
 
-        virtual void save() const = 0;
+    private: /* Methods: */
+
+        void setListWidgetItem(QListWidgetItem * const item) noexcept {
+            m_listWidgetItem = item;
+            item->setIcon(m_icon);
+            item->setText(m_headerText);
+        }
 
     private: /* Fields: */
 
-        QListWidgetItem * const m_listWidgetItem;
-        bool m_ownsListWidgetItem = true;
+        QIcon const m_icon;
+        QString m_headerText;
+        QListWidgetItem * m_listWidgetItem = nullptr;
 
     };
 
@@ -59,22 +74,22 @@ public: /* Methods: */
     BtConfigDialog(QWidget * const parent = nullptr,
                    Qt::WindowFlags const flags = Qt::WindowFlags());
 
-    /**
-      \brief Adds the page to this dialog, taking ownership.
-      \param[in] page pointer to the page to add.
-    */
+    /** Adds a BtConfigPage to the paged widget stack. The new page will be the current page.*/
     void addPage(Page * const pageWidget);
 
-    void save();
+    /** Adds a button box to the lower edge of the dialog. */
+    void setButtonBox(QDialogButtonBox * const buttonBox);
 
-Q_SIGNALS:
-
-    void signalSettingsChanged();
+    /** Changes the current page using the given index number. */
+    void setCurrentPage(int const newIndex);
 
 private: /* Fields: */
 
     QListWidget * const m_contentsList;
     QStackedWidget * const m_pageWidget;
+    QVBoxLayout * m_pageLayout;
     int m_maxItemWidth = 0;
 
 };
+
+#endif

@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -20,7 +20,6 @@
 #include "../keys/cswordkey.h"
 #include "../keys/cswordversekey.h"
 #include "../managers/cdisplaytemplatemgr.h"
-#include "../managers/cswordbackend.h"
 #include "../managers/referencemanager.h"
 
 // Sword includes:
@@ -32,32 +31,70 @@ using namespace Rendering;
 CTextRendering::KeyTreeItem::KeyTreeItem(const QString &key,
                                          const CSwordModuleInfo *module,
                                          const Settings &settings)
-    : m_settings(settings)
-    , m_key(key)
-{ m_moduleList.append(module); }
+        : m_settings(settings),
+        m_moduleList(),
+        m_key( key ),
+        m_childList(),
+        m_stopKey( QString() ),
+        m_alternativeContent( QString() ) {
+    m_moduleList.append( const_cast<CSwordModuleInfo*>(module) ); //BAD CODE
+}
 
 CTextRendering::KeyTreeItem::KeyTreeItem(const QString &content,
                                          const Settings &settings)
-    : m_settings(settings)
-    , m_alternativeContent(content)
-{}
+        : m_settings( settings ),
+        m_moduleList(),
+        m_key( QString() ),
+        m_childList(),
+        m_stopKey( QString() ),
+        m_alternativeContent( content ) {
+}
 
 CTextRendering::KeyTreeItem::KeyTreeItem(const QString &key,
                                          const BtConstModuleList &mods,
                                          const Settings &settings)
-    : m_settings(settings)
-    , m_moduleList(mods)
-    , m_key(key)
-{}
+        : m_settings( settings ),
+        m_moduleList( mods ),
+        m_key( key ),
+        m_childList(),
+        m_stopKey( QString() ),
+        m_alternativeContent( QString() ) {
+}
+
+CTextRendering::KeyTreeItem::KeyTreeItem()
+        : m_settings(),
+        m_moduleList(),
+        m_key(QString()),
+        m_childList(),
+        m_stopKey(QString()),
+        m_alternativeContent(QString()) {
+}
+
+CTextRendering::KeyTreeItem::KeyTreeItem(const KeyTreeItem& i)
+        : m_settings( i.m_settings ),
+        m_moduleList( i.m_moduleList ),
+        m_key( i.m_key ),
+        m_childList(),
+        m_stopKey( i.m_stopKey ),
+        m_alternativeContent( i.m_alternativeContent )
+{
+    const KeyTree &tree = *i.childList();
+    Q_FOREACH (const KeyTreeItem * const item, tree) {
+        m_childList.append(new KeyTreeItem((*item))); //deep copy
+    }
+
+}
 
 CTextRendering::KeyTreeItem::KeyTreeItem(const QString &startKey,
                                          const QString &stopKey,
                                          const CSwordModuleInfo *module,
                                          const Settings &settings)
-    : m_settings(settings)
-    , m_key(startKey)
-    , m_stopKey(stopKey)
-{
+        : m_settings( settings ),
+        m_moduleList(),
+        m_key( startKey ),
+        m_childList(),
+        m_stopKey( stopKey ),
+        m_alternativeContent( QString() ) {
     BT_ASSERT(module);
     m_moduleList.append(module);
 
@@ -74,35 +111,39 @@ CTextRendering::KeyTreeItem::KeyTreeItem(const QString &startKey,
             bool ok = true;
 
             while (ok && ((start < stop) || (start == stop)) ) { //range
-                m_childList.emplace_back(start.key(),
-                                         module,
-                                         KeyTreeItem::Settings{
-                                             false,
-                                             settings.keyRenderingFace});
+                m_childList.append(
+                            new KeyTreeItem(start.key(),
+                                            module,
+                                            KeyTreeItem::Settings{
+                                                false,
+                                                settings.keyRenderingFace}));
                 ok = start.next(CSwordVerseKey::UseVerse);
             }
         }
         else if (m_key.isEmpty()) {
-            m_childList.emplace_back(startKey,
-                                     module,
-                                     KeyTreeItem::Settings{
-                                         false,
-                                         settings.keyRenderingFace});
+            m_childList.append(
+                        new KeyTreeItem(startKey,
+                                        module,
+                                        KeyTreeItem::Settings{
+                                            false,
+                                            settings.keyRenderingFace}));
         }
     }
     else if ((module->type() == CSwordModuleInfo::Lexicon) || (module->type() == CSwordModuleInfo::Commentary) ) {
-        m_childList.emplace_back(startKey,
-                                 module,
-                                 KeyTreeItem::Settings{
-                                     false,
-                                     KeyTreeItem::Settings::NoKey});
+        m_childList.append(
+                    new KeyTreeItem(startKey,
+                                    module,
+                                    KeyTreeItem::Settings{
+                                        false,
+                                        KeyTreeItem::Settings::NoKey}));
     }
     else if (module->type() == CSwordModuleInfo::GenericBook) {
-        m_childList.emplace_back(startKey,
-                                 module,
-                                 KeyTreeItem::Settings{
-                                     false,
-                                     KeyTreeItem::Settings::NoKey});
+        m_childList.append(
+                    new KeyTreeItem(startKey,
+                                    module,
+                                    KeyTreeItem::Settings{
+                                        false,
+                                        KeyTreeItem::Settings::NoKey}));
     }
 
     //make it into "<simple|range> (modulename)"
@@ -133,29 +174,22 @@ CTextRendering::KeyTreeItem::KeyTreeItem(const QString &startKey,
     m_alternativeContent.prepend("<div class=\"rangeheading\" dir=\"ltr\">").append("</div>"); //insert the right tags
 }
 
-CTextRendering::CTextRendering(
-        bool addText,
-        DisplayOptions const & displayOptions,
-        FilterOptions const & filterOptions)
-    : m_displayOptions(displayOptions)
-    , m_filterOptions(filterOptions)
-    , m_addText(addText)
-{}
-
 BtConstModuleList CTextRendering::collectModules(const KeyTree &tree) const {
     //collect all modules which are available and used by child items
     BtConstModuleList modules;
 
-    for (auto const & item : tree)
-        for (auto const * const mod : item.modules())
+    Q_FOREACH (const KeyTreeItem * const c, tree) {
+        BT_ASSERT(c);
+        Q_FOREACH (const CSwordModuleInfo * const mod, c->modules()) {
             if (!modules.contains(mod))
                 modules.append(mod);
+        }
+    }
     return modules;
 }
 
 const QString CTextRendering::renderKeyTree(const KeyTree &tree) {
-    //CSwordBackend::instance()()->setDisplayOptions( m_displayOptions );
-    CSwordBackend::instance()->setFilterOptions(m_filterOptions);
+    initRendering();
 
     const BtConstModuleList modules = collectModules(tree);
     QString t;
@@ -165,59 +199,82 @@ const QString CTextRendering::renderKeyTree(const KeyTree &tree) {
     if (modules.count() == 1) { //this optimizes the rendering, only one key created for all items
         std::unique_ptr<CSwordKey> key(
                 CSwordKey::createInstance(modules.first()));
-        for (auto const & item : tree) {
-            key->setKey(item.key());
-            t.append(renderEntry(item, key.get()));
+        Q_FOREACH (const KeyTreeItem * const c, tree) {
+            key->setKey(c->key());
+            t.append(renderEntry(*c, key.get()));
         }
     }
     else {
-        for (auto const & item : tree)
-            t.append(renderEntry(item));
+        Q_FOREACH (const KeyTreeItem * const c, tree) {
+            t.append( renderEntry( *c ) );
+        }
     }
 
     return finishText(t, tree);
 }
 
 const QString CTextRendering::renderKeyRange(
-        CSwordVerseKey const & lowerBound,
-        CSwordVerseKey const & upperBound,
+        const QString &start,
+        const QString &stop,
         const BtConstModuleList &modules,
         const QString &highlightKey,
         const KeyTreeItem::Settings &keySettings)
 {
 
-    if (lowerBound == upperBound) // same key, render single key:
-        return renderSingleKey(lowerBound.key(), modules, keySettings);
+    const CSwordModuleInfo *module = modules.first();
+    //qWarning( "renderKeyRange start %s stop %s \n", start.latin1(), stop.latin1() );
 
-    // Render range:
-    BT_ASSERT(lowerBound < upperBound);
-    KeyTree tree;
-    KeyTreeItem::Settings settings = keySettings;
+    std::unique_ptr<CSwordKey> lowerBound( CSwordKey::createInstance(module) );
+    lowerBound->setKey(start);
 
-    auto curKey = lowerBound;
-    do {
-        //make sure the key given by highlightKey gets marked as current key
-        settings.highlight = (!highlightKey.isEmpty() ? (curKey.key() == highlightKey) : false);
+    std::unique_ptr<CSwordKey> upperBound( CSwordKey::createInstance(module) );
+    upperBound->setKey(stop);
 
-        /**
-            \todo We need to take care of linked verses if we render one or
-                  (esp) more modules. If the verses 2,3,4,5 are linked to 1,
-                  it should be displayed as one entry with the caption 1-5.
-        */
+    sword::SWKey* sw_start = dynamic_cast<sword::SWKey*>(lowerBound.get());
+    sword::SWKey* sw_stop = dynamic_cast<sword::SWKey*>(upperBound.get());
 
-        if (curKey.chapter() == 0) { // range was 0:0-1:x, render 0:0 first and jump to 1:0
-            curKey.setVerse(0);
-            tree.emplace_back(curKey.key(), modules, settings);
-            curKey.setChapter(1);
-            curKey.setVerse(0);
+    BT_ASSERT((*sw_start == *sw_stop) || (*sw_start < *sw_stop));
+
+    if (*sw_start == *sw_stop) { //same key, render single key
+        return renderSingleKey(lowerBound->key(), modules);
+    }
+    else if (*sw_start < *sw_stop) { // Render range
+        KeyTree tree;
+        KeyTreeItem::Settings settings = keySettings;
+
+        CSwordVerseKey* vk_start = dynamic_cast<CSwordVerseKey*>(lowerBound.get());
+        BT_ASSERT(vk_start);
+
+        CSwordVerseKey* vk_stop = dynamic_cast<CSwordVerseKey*>(upperBound.get());
+        BT_ASSERT(vk_stop);
+
+        while ((*vk_start < *vk_stop) || (*vk_start == *vk_stop)) {
+
+            //make sure the key given by highlightKey gets marked as current key
+            settings.highlight = (!highlightKey.isEmpty() ? (vk_start->key() == highlightKey) : false);
+
+            /**
+                \todo We need to take care of linked verses if we render one or
+                      (esp) more modules. If the verses 2,3,4,5 are linked to 1,
+                      it should be displayed as one entry with the caption 1-5.
+            */
+
+            if (vk_start->getChapter() == 0) { // range was 0:0-1:x, render 0:0 first and jump to 1:0
+                vk_start->setVerse(0);
+                tree.append( new KeyTreeItem(vk_start->key(), modules, settings) );
+                vk_start->setChapter(1);
+                vk_start->setVerse(0);
+            }
+            tree.append( new KeyTreeItem(vk_start->key(), modules, settings) );
+            if (!vk_start->next(CSwordVerseKey::UseVerse)) {
+                /// \todo Notify the user about this failure.
+                break;
+            }
         }
-        tree.emplace_back(curKey.key(), modules, settings);
-        if (!curKey.next(CSwordVerseKey::UseVerse)) {
-            /// \todo Notify the user about this failure.
-            break;
-        }
-    } while (curKey < upperBound);
-    return renderKeyTree(tree);
+        return renderKeyTree(tree);
+    }
+
+    return QString();
 }
 
 const QString CTextRendering::renderSingleKey(
@@ -226,209 +283,7 @@ const QString CTextRendering::renderSingleKey(
         const KeyTreeItem::Settings &settings)
 {
     KeyTree tree;
-    tree.emplace_back(key, modules, settings);
+    tree.append( new KeyTreeItem(key, modules, settings) );
+
     return renderKeyTree(tree);
 }
-
-QString CTextRendering::renderEntry(KeyTreeItem const & i, CSwordKey * k)
-{
-    if (i.hasAlternativeContent()) {
-        QString ret = i.settings().highlight
-                      ? "<div class=\"currententry\">"
-                      : "<div class=\"entry\">";
-        ret.append(i.getAlternativeContent());
-
-        if (!i.childList().empty()) {
-            KeyTree const & tree = i.childList();
-
-            BtConstModuleList const modules(collectModules(tree));
-
-            if (modules.count() == 1)
-                // insert the direction into the surrounding div:
-                ret.insert(5,
-                           QString("dir=\"%1\" ")
-                               .arg(modules.first()->textDirectionAsHtml()));
-
-            for (auto const & item : tree)
-                ret.append(renderEntry(item));
-        }
-
-        ret.append("</div>");
-        return ret; // WARNING: Return already here!
-    }
-
-
-    BtConstModuleList const & modules(i.modules());
-    if (modules.isEmpty())
-        return ""; // no module present for rendering
-
-    std::unique_ptr<CSwordKey> scoped_key(
-            !k ? CSwordKey::createInstance(modules.first()) : nullptr);
-    CSwordKey * const key = k ? k : scoped_key.get();
-    BT_ASSERT(key);
-
-    CSwordVerseKey * const myVK = dynamic_cast<CSwordVerseKey *>(key);
-    if (myVK)
-        myVK->setIntros(true);
-
-    QString renderedText((modules.count() > 1) ? "\n\t\t<tr>\n" : "\n");
-    // Only insert the table stuff if we are displaying parallel.
-
-    //declarations out of the loop for optimization
-    QString entry;
-    bool isRTL;
-    QString preverseHeading;
-    QString key_renderedText;
-
-    for (auto const & modulePtr : modules) {
-        BT_ASSERT(modulePtr);
-        if (myVK) {
-            key->setModule(*modules.begin());
-            key->setKey(i.key());
-
-            // this would change key position due to v11n translation
-            key->setModule(modulePtr);
-        } else {
-            key->setModule(modulePtr);
-            key->setKey(i.key());
-        }
-
-        // indicate that key was changed
-        i.setMappedKey(key->key() != i.key() ? key : nullptr);
-
-
-        isRTL = (modulePtr->textDirection() == CSwordModuleInfo::RightToLeft);
-        entry = QString();
-
-        auto & swModule = modulePtr->module();
-        auto const langAttr =
-                QString(" xml:lang=\"%1\" lang=\"%1\"").arg(
-                    modulePtr->language()->abbrev());
-
-        if (key->isValid() && i.key() == key->key()) {
-            key_renderedText = key->renderedText();
-
-            // if key was expanded
-            if (CSwordVerseKey const * const vk =
-                    dynamic_cast<CSwordVerseKey *>(key))
-            {
-                if (vk->isBoundSet()) {
-                    CSwordVerseKey pk(*vk);
-                    auto const lowerBoundIndex = vk->lowerBound().index();
-                    auto const upperBoundIndex = vk->upperBound().index();
-                    for (auto i = lowerBoundIndex; i < upperBoundIndex; ++i) {
-                        key_renderedText += " ";
-                        pk.setIndex(i + 1);
-                        key_renderedText += pk.renderedText();
-                    }
-                }
-            }
-        } else {
-            key_renderedText = "<span class=\"inactive\">&#8212;</span>";
-        }
-
-        if (m_filterOptions.headings && key->isValid() && i.key() == key->key()) {
-
-            // only process EntryAttributes, do not render, this might destroy the EntryAttributes again
-            swModule.renderText(nullptr, -1, 0);
-
-            for (auto const & vp
-                 : swModule.getEntryAttributes()["Heading"]["Preverse"])
-            {
-                QString unfiltered(QString::fromUtf8(vp.second.c_str()));
-
-                /// \todo This is only a preliminary workaround to strip the tags:
-                {
-                    static QRegExp const staticFilter(
-                            "(.*)<title[^>]*>(.*)</title>(.*)");
-                    QRegExp filter(staticFilter);
-                    while (filter.indexIn(unfiltered) >= 0)
-                        unfiltered = filter.cap(1) + filter.cap(2) + filter.cap(3);
-                }
-
-                // Filter out offending self-closing div tags, which are bad HTML
-                {
-                    static QRegExp const staticFilter("(.*)<div[^>]*/>(.*)");
-                    QRegExp filter(staticFilter);
-                    while (filter.indexIn(unfiltered) >= 0)
-                        unfiltered = filter.cap(1) + filter.cap(2);
-                }
-
-                preverseHeading = unfiltered;
-
-                /// \todo Take care of the heading type!
-                if (!preverseHeading.isEmpty()) {
-                    entry.append("<div ")
-                         .append(langAttr)
-                         .append(" class=\"sectiontitle\">")
-                         .append(preverseHeading)
-                         .append("</div>");
-                }
-            }
-        }
-
-        entry.append(m_displayOptions.lineBreaks  ? "<div class=\""  : "<div class=\"inline ");
-
-        if (modules.count() == 1) //insert only the class if we're not in a td
-            entry.append( i.settings().highlight  ? "currententry " : "entry " );
-        entry.append("\"");
-        entry.append(langAttr).append(isRTL ? " dir=\"rtl\">" : " dir=\"ltr\">");
-
-        //keys should normally be left-to-right, but this doesn't apply in all cases
-        if(key->isValid() && i.key() == key->key())
-            entry.append("<span class=\"entryname\" dir=\"ltr\">").append(entryLink(i, *modulePtr)).append("</span>");
-
-        if (m_addText)
-            entry.append(key_renderedText);
-
-        if (!i.childList().empty())
-            for (auto const & item : i.childList())
-                entry.append(renderEntry(item));
-
-        entry.append("</div>");
-
-        if (modules.count() == 1) {
-            renderedText.append("\t\t").append(entry).append("\n");
-        } else {
-            renderedText.append("\t\t<td class=\"")
-                .append(i.settings().highlight ? "currententry" : "entry")
-                .append("\" ")
-                .append(langAttr)
-                .append(" dir=\"")
-                .append(isRTL ? "rtl" : "ltr")
-                .append("\">\n")
-                .append( "\t\t\t" ).append( entry ).append("\n")
-                .append("\t\t</td>\n");
-        }
-    }
-
-    if (modules.count() > 1)
-        renderedText.append("\t\t</tr>\n");
-
-    //  qDebug("CTextRendering: %s", renderedText.latin1());
-    return renderedText;
-}
-
-QString CTextRendering::finishText(QString const & text, KeyTree const & tree) {
-    CDisplayTemplateMgr::Settings settings;
-    settings.modules = collectModules(tree);
-    if (settings.modules.count() == 1) {
-        CSwordModuleInfo const * const firstModule = settings.modules.first();
-        settings.langAbbrev = firstModule->language()->abbrev();
-        settings.textDirection = firstModule->textDirection();
-    } else {
-        settings.langAbbrev = "unknown";
-    }
-
-    return CDisplayTemplateMgr::instance()->fillTemplate(
-                CDisplayTemplateMgr::activeTemplateName(),
-                text,
-                settings);
-}
-
-/*!
-    \fn CTextRendering::entryLink( KeyTreeItem& item )
- */
-QString CTextRendering::entryLink(KeyTreeItem const & item,
-                                  CSwordModuleInfo const &)
-{ return item.key(); }

@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -60,9 +60,8 @@ void BtBookshelfGroupingMenu::initMenu(bool showNoGrouping) {
 
     m_groupingActionGroup = new QActionGroup(this);
     m_groupingActionGroup->setExclusive(true);
-    BT_CONNECT(m_groupingActionGroup, &QActionGroup::triggered,
-               [this](QAction * const action)
-               { Q_EMIT signalGroupingOrderChanged(getActionRef(action)); });
+    BT_CONNECT(m_groupingActionGroup, SIGNAL(triggered(QAction *)),
+               this, SLOT(slotGroupingActionTriggered(QAction *)));
 
     m_groupingCatLangAction = new QAction(this);
     m_groupingCatLangAction->setCheckable(true);
@@ -110,4 +109,8 @@ void BtBookshelfGroupingMenu::retranslateUi() {
     if (m_groupingNoneAction != nullptr) {
         m_groupingNoneAction->setText(tr("No grouping"));
     }
+}
+
+void BtBookshelfGroupingMenu::slotGroupingActionTriggered(QAction *action) {
+    emit signalGroupingOrderChanged(getActionRef(action));
 }

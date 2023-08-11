@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CSWORDKEY_H
+#define CSWORDKEY_H
 
 #include <QPointer>
 #include <QString>
@@ -18,7 +19,7 @@
 
 
 class CSwordModuleInfo;
-namespace sword { class SWKey; }
+class QTextCodec;
 
 /** Base class for all Sword based keys. */
 class CSwordKey {
@@ -33,20 +34,14 @@ public: /* Types: */
 
 public: /* Methods: */
 
-    virtual ~CSwordKey() noexcept;
-
     CSwordKey & operator=(CSwordKey const &) = delete;
 
-    /** \returns a reference to this object as a sword::SWKey. */
-    virtual sword::SWKey const & asSwordKey() const noexcept = 0;
+    virtual inline ~CSwordKey() { delete m_beforeChangedSignaller; }
 
     /**
       \returns The key which belongs to the current object.
     */
     virtual QString key() const = 0;
-
-    /// \returns the normalized (English) key.
-    virtual QString normalizedKey() const;
 
     /**
       Sets the current key using a utf8 enabled QString.
@@ -68,14 +63,17 @@ public: /* Methods: */
     /**
       \returns the module which belongs to this key.
     */
-    CSwordModuleInfo const * module() const { return m_module; }
+    inline const CSwordModuleInfo * module() const {
+        return m_module;
+    }
 
     /**
       Sets the module which belongs to this key.
       \param[in] newModule the module to set.
     */
-    virtual void setModule(const CSwordModuleInfo * newModule)
-    { m_module = newModule; }
+    virtual inline void setModule(const CSwordModuleInfo * newModule) {
+        m_module = newModule;
+    }
 
     /**
       \returns the raw, unchanged text from the module (i.e. without any filter
@@ -94,6 +92,7 @@ public: /* Methods: */
     */
     QString strippedText();
 
+    const BtSignal * beforeChangedSignaller();
     const BtSignal * afterChangedSignaller();
 
     /**
@@ -103,7 +102,12 @@ public: /* Methods: */
     static CSwordKey * createInstance(const CSwordModuleInfo * module);
 
     /** Check whether key is valid. Can be invalidated during av11n mapping. */
-    bool isValid() const { return m_valid; }
+    inline bool isValid() const { return m_valid; }
+
+    /**
+      This is called before a key change to emit a signal
+    */
+    void emitBeforeChanged();
 
     /**
       This is called after a key change to emit a signal
@@ -112,11 +116,11 @@ public: /* Methods: */
 
 protected: /* Methods: */
 
-    CSwordKey(CSwordModuleInfo const * const module = nullptr)
+    inline CSwordKey(const CSwordModuleInfo * const module = nullptr)
         : m_module(module)
         , m_valid(true) {}
 
-    CSwordKey(CSwordKey const & copy)
+    inline CSwordKey(const CSwordKey & copy)
         : m_module(copy.m_module)
         , m_valid(copy.m_valid) {}
 
@@ -125,10 +129,16 @@ protected: /* Methods: */
     */
     virtual const char * rawKey() const = 0;
 
+    static inline const QTextCodec * cp1252Codec() { return m_cp1252Codec; }
+
 protected: /* Fields: */
 
+    static const QTextCodec * m_cp1252Codec;
     const CSwordModuleInfo * m_module;
+    QPointer<BtSignal> m_beforeChangedSignaller;
     QPointer<BtSignal> m_afterChangedSignaller;
 
     bool m_valid;
 };
+
+#endif

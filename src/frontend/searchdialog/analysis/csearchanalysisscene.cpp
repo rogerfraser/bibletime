@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -12,19 +12,19 @@
 
 #include "csearchanalysisscene.h"
 
-#include <algorithm>
 #include <QApplication>
 #include <QFileDialog>
-#include <QMap>
+#include <QHashIterator>
 #include <QTextCodec>
 #include <QTextDocument>
-#include <QVector>
-#include <type_traits>
-#include <utility>
 #include "../../../backend/keys/cswordversekey.h"
-#include "../../../util/btassert.h"
 #include "../../../util/tool.h"
 #include "../csearchdialog.h"
+#include "csearchanalysisitem.h"
+#include "csearchanalysislegenditem.h"
+
+// Sword includes
+#include <listkey.h>
 
 
 namespace Search {
@@ -48,121 +48,138 @@ const int LEGEND_INNER_BORDER = 5;
 const int LEGEND_DELTAY = 4;
 const int LEGEND_WIDTH = 85;
 
-CSearchAnalysisScene::CSearchAnalysisScene(
-        CSwordModuleSearch::Results const & results,
-        QObject * parent)
-    : QGraphicsScene(parent)
-{
+
+CSearchAnalysisScene::CSearchAnalysisScene(QObject *parent )
+        : QGraphicsScene(parent),
+        m_scaleFactor(0.0),
+        m_legend(nullptr) {
     setBackgroundBrush(QBrush(Qt::white));
     setSceneRect(0, 0, 1, 1);
+}
 
-    for (auto const & result : results)
-        if ((result.module->type() == CSwordModuleInfo::Bible)
-            || (result.module->type() == CSwordModuleInfo::Commentary))
-            m_results.emplace_back(result);
+/** Starts the analysis of the search result. This should be called only once because QCanvas handles the updates automatically. */
+void CSearchAnalysisScene::analyse(
+        const CSwordModuleSearch::Results &results)
+{
+    using RCI = CSwordModuleSearch::Results::const_iterator;
 
-    auto const numberOfModules = m_results.size();
+    /**
+    * Steps of analysing our search result;
+    * -Create the items for all available books ("Genesis" - "Revelation")
+    * -Iterate through all modules we analyse
+    *  -Go through all books of this module
+    *   -Find out how many times we found the book
+    *   -Set the count to the items which belongs to the book
+    */
+    setResults(results);
+
+    m_lastPosList.clear();
+    const int numberOfModules = m_results.count();
     if (!numberOfModules)
         return;
-    m_legend = std::make_unique<CSearchAnalysisLegendItem>(&m_results);
-    addItem(m_legend.get());
+    m_legend = new CSearchAnalysisLegendItem(m_results.keys());
+    addItem(m_legend);
     m_legend->setRect(LEFT_BORDER, UPPER_BORDER,
                       LEGEND_WIDTH, LEGEND_INNER_BORDER*2 + ITEM_TEXT_SIZE*numberOfModules + LEGEND_DELTAY*(numberOfModules - 1) );
     m_legend->show();
 
+    int xPos = static_cast<int>(LEFT_BORDER + m_legend->rect().width() + SPACE_BETWEEN_PARTS);
     int moduleIndex = 0;
-    for (auto const & result : m_results) {
-        qApp->processEvents(QEventLoop::AllEvents);
-        for (auto const & moduleresultPtr : result.results) {
-            /* m_results only contains results from Bibles and
-               Commentaries, as filtered above. */
-            BT_ASSERT(dynamic_cast<sword::VerseKey const *>(
-                          moduleresultPtr.get()));
-            auto const * const vk =
-                    static_cast<sword::VerseKey const *>(
-                        moduleresultPtr.get());
-            auto key = std::tuple(vk->getTestament(), vk->getBook());
-            CSearchAnalysisItem * analysisItem;
-            static_assert(std::is_same_v<decltype(key),
-                                         decltype(m_itemList)::key_type>, "");
-            if (auto const it = m_itemList.find(key); it != m_itemList.end()) {
-                analysisItem = it->second;
-            } else {
-                analysisItem =
-                        new CSearchAnalysisItem(
-                            QString::fromUtf8(vk->getBookName()),
-                            m_results.size());
-                m_itemList.emplace(std::move(key), analysisItem);
+    m_maxCount = 0;
+    int count = 0;
+    CSwordVerseKey key(nullptr);
+    key.setKey("Genesis 1:1");
+
+    CSearchAnalysisItem* analysisItem = m_itemList[key.book()];
+    bool ok = true;
+    while (ok && analysisItem) {
+        moduleIndex = 0;
+        for (RCI it = m_results.begin(); it != m_results.end(); ++it) {
+            qApp->processEvents( QEventLoop::AllEvents );
+            if (!m_lastPosList.contains(it.key())) {
+                m_lastPosList.insert(it.key(), 0);
             }
-            auto const count = ++analysisItem->counts()[moduleIndex];
-            m_maxCount = std::max(m_maxCount, count);
+
+            analysisItem->setCountForModule(moduleIndex, (count = getCount(key.book(), it.key())));
+            m_maxCount = (count > m_maxCount) ? count : m_maxCount;
+
+            ++moduleIndex;
         }
-
-        ++moduleIndex;
-    }
-
-    int xPos = static_cast<int>(LEFT_BORDER
-                                + m_legend->rect().width()
-                                + SPACE_BETWEEN_PARTS);
-    for (auto const & vp : m_itemList) {
-        auto & analysisItem = *vp.second;
-        addItem(&analysisItem);
-        analysisItem.setRect(xPos,
-                             UPPER_BORDER,
-                             analysisItem.rect().width(),
-                             analysisItem.rect().height());
-        xPos += static_cast<int>(analysisItem.width() + SPACE_BETWEEN_PARTS);
-
-        QString toolTip("<center><b>");
-        toolTip.append(analysisItem.bookName().toHtmlEscaped())
-               .append("</b></center><hr/><table cellspacing=\"0\" "
-                       "cellpadding=\"3\" width=\"100%\" height=\"100%\" "
-                       "align=\"center\">");
-
-        int i = 0;
-        for (auto const & result : m_results) {
-            auto const * const info = result.module;
-
-            auto const count = result.results.size();
-            double const percent =
-                    (info && count)
-                    ? ((static_cast<double>(analysisItem.counts()[i])
-                        * static_cast<double>(100.0))
-                       / static_cast<double>(count))
-                    : 0.0;
-            toolTip.append("<tr bgcolor=\"white\"><td><b><font color=\"")
-                   .append(getColor(i).name()).append("\">")
-                   .append(info ? info->name() : QString())
-                   .append("</font></b></td><td>")
-                   .append(QString::number(analysisItem.counts()[i]))
-                   .append(" (")
-                   .append(QString::number(percent, 'g', 2))
-                   .append("%)</td></tr>");
-            ++i;
+        if (analysisItem->hasHitsInAnyModule()) {
+            analysisItem->setRect(xPos, UPPER_BORDER, analysisItem->rect().width(), analysisItem->rect().height());
+            QString tip = analysisItem->getToolTip();
+            analysisItem->setToolTip(tip);
+            analysisItem->show();
+            xPos += static_cast<int>(analysisItem->width() + SPACE_BETWEEN_PARTS);
         }
-        toolTip.append("</table>");
-        analysisItem.setToolTip(toolTip);
+        ok = key.next(CSwordVerseKey::UseBook);
+        analysisItem = m_itemList[key.book()];
     }
-    setSceneRect(0, 0, xPos + BAR_WIDTH + (m_results.size() - 1)*BAR_DELTAX + RIGHT_BORDER, height() );
+    setSceneRect(0, 0, xPos + BAR_WIDTH + (m_results.count() - 1)*BAR_DELTAX + RIGHT_BORDER, height() );
     slotResized();
+}
+
+/** Sets the module list used for the analysis. */
+void CSearchAnalysisScene::setResults(
+        const CSwordModuleSearch::Results &results)
+{
+    using RCI = CSwordModuleSearch::Results::const_iterator;
+
+    m_results.clear();
+    for (RCI it = results.begin(); it != results.end(); ++it) {
+        const CSwordModuleInfo *m = it.key();
+        if ( (m->type() == CSwordModuleInfo::Bible) || (m->type() == CSwordModuleInfo::Commentary) ) { //a Bible or an commentary
+            m_results.insert(m, it.value());
+        }
+    }
+
+    m_itemList.clear();
+    CSearchAnalysisItem* analysisItem = nullptr;
+    CSwordVerseKey key(nullptr);
+    key.setKey("Genesis 1:1");
+    do {
+        analysisItem = new CSearchAnalysisItem(m_results.count(), key.book(), &m_scaleFactor, m_results);
+        addItem(analysisItem);
+        analysisItem->hide();
+        m_itemList.insert(key.book(), analysisItem);
+    }
+    while (key.next(CSwordVerseKey::UseBook));
+    update();
+}
+
+/** Sets back the items and deletes things to cleanup */
+void CSearchAnalysisScene::reset() {
+    m_scaleFactor = 0.0;
+
+    QHashIterator<QString, CSearchAnalysisItem*> it( m_itemList ); // iterator for items
+    while ( it.hasNext() ) {
+        it.next();
+        if (it.value()) it.value()->hide();
+    }
+    m_lastPosList.clear();
+
+    if (m_legend) m_legend->hide();
+
+    delete m_legend;
+    m_legend = nullptr;
+
+    update();
 }
 
 /** No descriptions */
 void CSearchAnalysisScene::slotResized() {
-    double scaleFactor;
     if (m_maxCount <= 0) {
-        scaleFactor = 0.0;
+        m_scaleFactor = 0.0;
     } else {
-        scaleFactor = static_cast<double>(height() - UPPER_BORDER - LOWER_BORDER - BAR_LOWER_BORDER - 100 - (m_results.size() - 1) * BAR_DELTAY)
-                      / static_cast<double>(m_maxCount);
+        m_scaleFactor = static_cast<double>(height() - UPPER_BORDER - LOWER_BORDER - BAR_LOWER_BORDER - 100 - (m_results.count() - 1) * BAR_DELTAY)
+                        / static_cast<double>(m_maxCount);
     }
-    for (auto const & vp : m_itemList) {
-        auto & analysisItem = *vp.second;
-        analysisItem.setScaleFactor(scaleFactor);
-        analysisItem.setRect(analysisItem.rect().x(),
-                             UPPER_BORDER,
-                             BAR_WIDTH + (m_results.size() - 1) * BAR_DELTAX,
-                             height() - LOWER_BORDER - BAR_LOWER_BORDER);
+    QHashIterator<QString, CSearchAnalysisItem*> it( m_itemList );
+    while ( it.hasNext() ) {
+        it.next();
+        if (it.value()) {
+            it.value()->setRect(it.value()->rect().x(), UPPER_BORDER, BAR_WIDTH + (m_results.count() - 1)*BAR_DELTAX, height() - LOWER_BORDER - BAR_LOWER_BORDER);
+        }
     }
     update();
 }
@@ -195,7 +212,28 @@ QColor CSearchAnalysisScene::getColor(int index) {
     }
 }
 
+unsigned int CSearchAnalysisScene::getCount(const QString &book,
+                                            const CSwordModuleInfo* module)
+{
+    const sword::ListKey & result = m_results[module];
+
+    const int length = book.length();
+    unsigned int i = m_lastPosList[module];
+    unsigned int count = 0;
+    const unsigned int resultCount = result.getCount();
+    while (i < resultCount) {
+        if (strncmp(book.toUtf8(), result.getElement(i)->getText(), length))
+            break;
+        i++;
+        ++count;
+    }
+    m_lastPosList.insert(module, i);
+    return count;
+}
+
 void CSearchAnalysisScene::saveAsHTML() {
+    using RCI = CSwordModuleSearch::Results::const_iterator;
+
     auto const fileName =
             QFileDialog::getSaveFileName(
                 nullptr,
@@ -236,34 +274,42 @@ void CSearchAnalysisScene::saveAsHTML() {
     text += tr("Book");
     text += "</th>";
 
-    for (auto const & result : m_results) {
+    for (RCI it = m_results.begin(); it != m_results.end(); ++it) {
         text += "<th>";
-        text += result.module->name().toHtmlEscaped();
+        text += it.key()->name().toHtmlEscaped();
         text += "</th>";
     }
     text += "</tr>";
 
-    for (auto const & vp : m_itemList) {
-        auto const & analysisItem = *vp.second;
+    CSwordVerseKey key(nullptr);
+    key.setKey("Genesis 1:1");
+
+    do {
         text += "<tr><td>";
-        text += analysisItem.bookName().toHtmlEscaped();
+        const QString keyBook(key.book());
+        text += keyBook.toHtmlEscaped();
         text += "</td>";
-        for (auto const count : analysisItem.counts())
-            text += "<td class=\"r\">" + QString::number(count) + "</td>";
+
+        int mi = 0; // Module index
+        for (RCI it = m_results.begin(); it != m_results.end(); ++it, ++mi) {
+            text += "<td class=\"r\">";
+            text += QString::number(m_itemList.value(keyBook)->getCountForModule(mi));
+            text += "</td>";
+        }
         text += "</tr>";
-    }
+    } while (key.next(CSwordVerseKey::UseBook));
     text += "<tr><th class=\"r\">";
     text += tr("Total hits");
     text += "</th>";
 
-    for (auto const & result : m_results) {
+    for (RCI it = m_results.begin(); it != m_results.end(); ++it) {
         text += "<td class=\"r\">";
-        text += QString::number(result.results.size());
+        text += QString::number(it.value().getCount());
         text += "</td>";
     }
 
     text += "</tr></table><p style=\"text-align:center;font-size:x-small\">";
-    text += tr("Created by <a href=\"https://bibletime.info/\">BibleTime</a>");
+    text += tr("Created by <a href=\"http://www.bibletime.info/\">BibleTime</a>");
     text += "</p></body></html>";
 
     util::tool::savePlainFile(fileName, text, QTextCodec::codecForName("UTF-8"));

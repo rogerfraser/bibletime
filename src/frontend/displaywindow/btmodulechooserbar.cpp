@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -18,8 +18,8 @@
 #include <QToolBar>
 #include "../../util/btconnect.h"
 #include "../../util/btmodules.h"
-#include "../displaywindow/cdisplaywindow.h"
 #include "btmodulechooserbutton.h"
+#include "creadwindow.h"
 
 
 BtModuleChooserBar::BtModuleChooserBar(QWidget *parent)
@@ -89,13 +89,13 @@ BtModuleChooserButton* BtModuleChooserBar::addButton() {
        widget with that QAction may follow, but the widget might already have
        been deleted. */
     BT_CONNECT(b,        &BtModuleChooserButton::sigModuleAdd,
-               m_window, &CDisplayWindow::slotAddModule,
+               m_window, &CReadWindow::slotAddModule,
                Qt::QueuedConnection);
     BT_CONNECT(b,        &BtModuleChooserButton::sigModuleReplace,
-               m_window, &CDisplayWindow::slotReplaceModule,
+               m_window, &CReadWindow::slotReplaceModule,
                Qt::QueuedConnection);
     BT_CONNECT(b,        &BtModuleChooserButton::sigModuleRemove,
-               m_window, &CDisplayWindow::slotRemoveModule,
+               m_window, &CReadWindow::slotRemoveModule,
                Qt::QueuedConnection);
 
     a->setVisible(true);
@@ -104,10 +104,7 @@ BtModuleChooserButton* BtModuleChooserBar::addButton() {
 
 
 /** Sets the modules which are chosen in this module chooser bar. */
-void BtModuleChooserBar::setModules(QStringList useModules,
-                                    CSwordModuleInfo::ModuleType type,
-                                    CDisplayWindow * window)
-{
+void BtModuleChooserBar::setModules( QStringList useModules,CSwordModuleInfo::ModuleType type, CReadWindow* window) {
     m_modules = useModules;
     m_window = window;
     m_moduleType = type;
@@ -125,9 +122,9 @@ void BtModuleChooserBar::setModules(QStringList useModules,
     }
     updateButtonMenus();
 
-    BT_CONNECT(m_window, &CDisplayWindow::sigModuleListSet,
+    BT_CONNECT(m_window, &CReadWindow::sigModuleListSet,
                this,     &BtModuleChooserBar::slotBackendModulesChanged);
-    BT_CONNECT(m_window, &CDisplayWindow::sigModuleListChanged,
+    BT_CONNECT(m_window, &CReadWindow::sigModuleListChanged,
                this,     &BtModuleChooserBar::slotWindowModulesChanged);
 }
 

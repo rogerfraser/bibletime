@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -12,21 +12,18 @@
 
 #include "btmoduleindexdialog.h"
 
-#include <array>
 #include <QApplication>
-#include <mutex>
-#include <utility>
+#include <QMutexLocker>
 #include "../backend/managers/cswordbackend.h"
 #include "../util/btassert.h"
 #include "../util/btconnect.h"
-#include "../util/btdebugonly.h"
 #include "messagedialog.h"
 
 
 bool BtModuleIndexDialog::indexAllModules(const QList<CSwordModuleInfo *> &modules)
 {
-    static std::mutex mutex;
-    std::lock_guard guard(mutex);
+    static QMutex mutex;
+    QMutexLocker lock(&mutex);
 
     if (modules.empty()) return true;
 
@@ -50,7 +47,7 @@ bool BtModuleIndexDialog::indexAllModulesPrivate(const QList<CSwordModuleInfo*> 
     bool success = true;
 
     QList <CSwordModuleInfo*> indexedModules;
-    for (auto * const m : modules) {
+    Q_FOREACH(CSwordModuleInfo * const m, modules) {
         BT_ASSERT(!m->hasIndex());
 
         /*
@@ -59,21 +56,10 @@ bool BtModuleIndexDialog::indexAllModulesPrivate(const QList<CSwordModuleInfo*> 
         */
         indexedModules.append(m);
 
-        std::array<QMetaObject::Connection, 3u> connections{
-                BT_CONNECT(this, &BtModuleIndexDialog::canceled,
-                           m /* needed */,  [m]{ m->cancelIndexing(); }),
-                BT_CONNECT(m, &CSwordModuleInfo::indexingFinished,
-                           this, // needed
-                           [this]{
-                               setValue(m_currentModuleIndex * 100 + 100);
-                               qApp->processEvents();
-                           }),
-                BT_CONNECT(m, &CSwordModuleInfo::indexingProgress,
-                           this, // needed
-                           [this](int percentage) {
-                               setValue(m_currentModuleIndex * 100 + percentage);
-                               qApp->processEvents();
-                           })};
+        BT_CONNECT(this, SIGNAL(canceled()), m, SLOT(cancelIndexing()));
+        BT_CONNECT(m, SIGNAL(indexingFinished()), this, SLOT(slotFinished()));
+        BT_CONNECT(m,    SIGNAL(indexingProgress(int)),
+                   this, SLOT(slotModuleProgress(int)));
 
         // Single module indexing blocks until finished:
         setLabelText(tr("Creating index for work: %1").arg(m->name()));
@@ -99,21 +85,32 @@ bool BtModuleIndexDialog::indexAllModulesPrivate(const QList<CSwordModuleInfo*> 
 
         m_currentModuleIndex++;
 
-        for (auto & connection : connections) {
-            BT_DEBUG_ONLY(auto const r =) disconnect(std::move(connection));
-            BT_ASSERT(r);
-        }
+        disconnect(this, SIGNAL(canceled()),
+                   m,    SLOT(cancelIndexing()));
+        disconnect(m,    SIGNAL(indexingFinished()),
+                   this, SLOT(slotFinished()));
+        disconnect(m,    SIGNAL(indexingProgress(int)),
+                   this, SLOT(slotModuleProgress(int)));
 
         if (wasCanceled()) success = false;
 
         if (!success) break;
     }
 
-    if (!success) {
+    if (!success)
         // Delete already created indices:
-        for (auto * const m : indexedModules)
+        Q_FOREACH(CSwordModuleInfo * const m, indexedModules)
             if (m->hasIndex())
                 m->deleteIndex();
-    }
     return success;
+}
+
+void BtModuleIndexDialog::slotModuleProgress(int percentage) {
+    setValue(m_currentModuleIndex * 100 + percentage);
+    qApp->processEvents();
+}
+
+void BtModuleIndexDialog::slotFinished() {
+    setValue(m_currentModuleIndex * 100 + 100);
+    qApp->processEvents();
 }

@@ -21,7 +21,8 @@
  *
  */
 
-#pragma once
+#ifndef RAWFILES_H
+#define RAWFILES_H
 
 #include <rawverse.h>
 #include <swcom.h>
@@ -82,3 +83,4 @@ public:
 };
 
 SWORD_NAMESPACE_END
+#endif

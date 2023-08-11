@@ -22,63 +22,57 @@
 #include "BtMimeData.h"
 
 
-BtTextBrowser::BtTextBrowser(QWidget * parent)
-    : QTextBrowser(parent)
-{ setTextInteractionFlags(Qt::TextSelectableByMouse); }
-
-void BtTextBrowser::keyPressEvent(QKeyEvent * event) {
-    QTextBrowser::keyPressEvent(event);
-    if (event->isAccepted())
-        m_readyToStartDrag = false;
+BtTextBrowser::BtTextBrowser(QWidget *parent)
+    : QTextBrowser(parent),
+      m_isDragging(false),
+      m_mousePressed(false)
+{
+    setTextInteractionFlags(Qt::TextSelectableByMouse);
 }
 
-void BtTextBrowser::mousePressEvent(QMouseEvent * event) {
-    if (event->buttons() == Qt::LeftButton) {
-        m_startPos = event->pos();
-        m_readyToStartDrag = true;
-    } else {
-        m_readyToStartDrag = false;
+void BtTextBrowser::mousePressEvent(QMouseEvent *event) {
+    if (event->button() == Qt::LeftButton) {
+        m_mousePressed = true;
+        m_isDragging = false;
+        m_dragUrl = anchorAt(event->pos());
+        m_startPos = QPoint(event->x(), event->y());
     }
     QTextBrowser::mousePressEvent(event);
 }
 
-void BtTextBrowser::mouseReleaseEvent(QMouseEvent * event) {
-    m_readyToStartDrag = false;
-    QTextBrowser::mouseReleaseEvent(event);
+void BtTextBrowser::mouseReleaseEvent(QMouseEvent *event) {
+    if (event->button() == Qt::LeftButton) {
+        m_mousePressed = false;
+    }
 }
 
-void BtTextBrowser::mouseMoveEvent(QMouseEvent * event) {
-    if (m_readyToStartDrag) {
-        auto const dragManhattanLength =
-                (event->pos() - m_startPos).manhattanLength();
-        if (dragManhattanLength >= qApp->startDragDistance()) {
-            m_readyToStartDrag = false;
-
-            if (auto const decodedLink =
-                        ReferenceManager::decodeHyperlink(anchorAt(m_startPos)))
-            {
-                auto mimedata =
-                        std::make_unique<BTMimeData>(
-                            decodedLink->module->name(),
-                            decodedLink->key,
-                            QString());
-
-                //add real Bible text from module/key
-                if (auto const * const module =
-                            CSwordBackend::instance()->findModuleByName(
-                                decodedLink->module->name()))
-                {
-                    std::unique_ptr<CSwordKey> key(
-                                CSwordKey::createInstance(module));
-                    key->setKey(decodedLink->key);
-                    mimedata->setText(key->strippedText());
-                }
-
-                auto * const drag = new QDrag(this); // Deleted by Qt
-                drag->setMimeData(mimedata.release());
-                drag->exec(Qt::CopyAction, Qt::CopyAction);
+void BtTextBrowser::mouseMoveEvent(QMouseEvent *event) {
+    // If we have not started dragging, and the left mouse button is down, start the drag
+    if (!m_isDragging && m_mousePressed) {
+        QPoint current(event->x(), event->y());
+        if ((current - m_startPos).manhattanLength() > qApp->startDragDistance()) {
+            QString moduleName;
+            QString keyName;
+            ReferenceManager::Type type;
+            if ( !ReferenceManager::decodeHyperlink(m_dragUrl, moduleName, keyName, type) ) {
+                QTextBrowser::mouseMoveEvent(event);
                 return;
             }
+            QDrag* drag = new QDrag(this);
+            BTMimeData* mimedata = new BTMimeData(moduleName, keyName, QString());
+            drag->setMimeData(mimedata);
+
+            //add real Bible text from module/key
+            if (CSwordModuleInfo *module = CSwordBackend::instance()->findModuleByName(moduleName)) {
+                std::unique_ptr<CSwordKey> key(CSwordKey::createInstance(module));
+                key->setKey(keyName);
+                mimedata->setText(key->strippedText());
+            }
+
+            m_isDragging = true;
+            drag->exec(Qt::CopyAction, Qt::CopyAction);
+            m_mousePressed = false;
+            return;
         }
     }
     QTextBrowser::mouseMoveEvent(event);

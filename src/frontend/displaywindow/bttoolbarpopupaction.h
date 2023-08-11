@@ -2,18 +2,18 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BT_TOOLBAR_POPUP_ACTION_H
+#define BT_TOOLBAR_POPUP_ACTION_H
 
 #include <QWidgetAction>
-#include <memory>
 
 
 class QIcon;
@@ -37,8 +37,16 @@ class BtToolBarPopupAction : public QWidgetAction {
     protected:
         QWidget* createWidget(QWidget* parent) override;
 
+    private slots:
+
+// Slot to emit a triggered signal when the toolbar button is pressed
+        void buttonPressed();
+
     private:
-        std::unique_ptr<QMenu> const m_menu;
+        QMenu* m_menu;
+        QToolButton* m_button;
         QIcon m_icon;
         QString m_text;
 };
+
+#endif

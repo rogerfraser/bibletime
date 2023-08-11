@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -55,24 +55,13 @@ CLexiconKeyChooser::CLexiconKeyChooser(const BtConstModuleList & modules,
 
     m_layout->addWidget(m_widget, 0, Qt::AlignLeft);
 
-    auto const activatedSlot =
-            [this](int index) {
-                if (m_key) {
-                    auto text(m_widget->comboBox().itemText(index));
-                    /* Check to prevent from eternal loop, because activated()
-                       is emitted again: */
-                    if (m_key->key() != text) {
-                        m_key->setKey(std::move(text));
-                        setKey(m_key);
-                    }
-                }
-            };
-    BT_CONNECT(m_widget, &CKeyChooserWidget::changed, activatedSlot);
-    BT_CONNECT(m_widget, &CKeyChooserWidget::focusOut, activatedSlot);
+    BT_CONNECT(m_widget, SIGNAL(changed(int)), SLOT(activated(int)));
+    BT_CONNECT(m_widget, SIGNAL(focusOut(int)), SLOT(activated(int)));
 
     setModules(modules, true);
     setKey(key);
-    BT_CONNECT(this, &CKeyChooser::keyChanged, history(), &BTHistory::add);
+    BT_CONNECT(this,      SIGNAL(keyChanged(CSwordKey *)),
+               history(), SLOT(add(CSwordKey *)) );
 }
 
 CSwordKey* CLexiconKeyChooser::key() {
@@ -99,7 +88,23 @@ void CLexiconKeyChooser::setKey(CSwordKey* key) {
     updateKey(key);
 
     //   qWarning("setKey end");
-    Q_EMIT keyChanged( m_key);
+    emit keyChanged( m_key);
+}
+
+void CLexiconKeyChooser::activated(int index) {
+    //  qWarning("activated");
+    const QString text = m_widget->comboBox().itemText(index);
+
+    // To prevent from eternal loop, because activated() is emitted again
+    if (m_key && m_key->key() != text) {
+        m_key->setKey(text);
+        setKey(m_key);
+    }
+    //  qWarning("activated end");
+}
+
+inline bool my_cmpEntries(const QString& a, const QString& b) {
+    return a < b;
 }
 
 /** Reimplementation. */
@@ -109,15 +114,18 @@ void CLexiconKeyChooser::refreshContent() {
         //     qWarning("resetted");
     }
     else {
-        std::multimap<unsigned int, QStringList const *> entryMap;
-        for (auto const * const modulePtr : m_modules) {
-            auto const & entries = modulePtr->entries();
-            entryMap.emplace(entries.count(), &entries);
+        using EntryMap = std::multimap<unsigned int, QStringList const *>;
+        EntryMap entryMap;
+
+        QListIterator<const CSwordLexiconModuleInfo*> mit(m_modules);
+        while (mit.hasNext()) {
+            const QStringList &entries = mit.next()->entries();
+            entryMap.insert( std::make_pair(entries.count(), &entries) );
         }
 
         QStringList goodEntries; //The string list which contains the entries which are available in all modules
 
-        auto it(entryMap.begin()); // iterator to go though all selected modules
+        EntryMap::iterator it = entryMap.begin(); //iterator to go thoigh all selected modules
         QStringList refEntries = *(it->second); //copy the items for the first time
         const QStringList *cmpEntries = (++it)->second; //list for comparision, starts with the second module in the map
 
@@ -128,7 +136,8 @@ void CLexiconKeyChooser::refreshContent() {
             std::set_union(
                 refEntries.begin(), --(refEntries.end()), //--end() is the last valid entry
                 cmpEntries->begin(), --(cmpEntries->end()),
-                std::back_inserter(goodEntries) //append valid entries to the end of goodEntries
+                std::back_inserter(goodEntries), //append valid entries to the end of goodEntries
+                my_cmpEntries  //ci_cmpEntries is the comparision function
             );
 
             cmpEntries = ( ++it )->second; //this is a pointer to the string list of a new module
@@ -138,7 +147,7 @@ void CLexiconKeyChooser::refreshContent() {
             * because the final list can only have the entries of goodEntries as maxiumum
             */
             refEntries = goodEntries;
-        }
+        };
 
         m_widget->reset(goodEntries, 0, true); //write down the entries
     } //end of ELSE
@@ -153,16 +162,17 @@ void CLexiconKeyChooser::setModules(const BtConstModuleList &modules,
     while (!m_modules.isEmpty())
         m_modules.takeFirst(); // not deleting the pointer
 
-    for (auto const * const m : modules)
+    Q_FOREACH(CSwordModuleInfo const * const m, modules)
         if (CSLMI const * const lexicon = dynamic_cast<CSLMI const *>(m))
             m_modules.append(lexicon);
 
     if (refresh) {
         refreshContent();
+        //   adjustFont();
     }
 }
 
-void CLexiconKeyChooser::handleHistoryMoved(QString const & newKey) {
+void CLexiconKeyChooser::setKey(const QString & newKey) {
     m_key->setKey(newKey);
     setKey(m_key);
 }

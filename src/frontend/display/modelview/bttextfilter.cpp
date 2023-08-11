@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -30,9 +30,7 @@ QString BtTextFilter::processText(const QString &text) {
     fixDoubleBR();
     if (m_showReferences) {
 
-        int i = 0;
-        int count = m_parts.count();
-        do {
+        for (int i = 0; i < m_parts.count();) {
             QString part = m_parts.at(i);
 
             if (part.startsWith("<") && part.contains("class=\"footnote\"")) {
@@ -48,7 +46,7 @@ QString BtTextFilter::processText(const QString &text) {
             } else {
                 i++;
             }
-        } while (i < count);
+        }
 
     }
     return m_parts.join("");
@@ -86,7 +84,7 @@ void BtTextFilter::splitText(const QString& text) {
 
 void BtTextFilter::fixDoubleBR() {
     for (int index = 2; index < m_parts.count(); ++index) {
-        QRegExp rx("<br\\s+/>");
+        QRegExp rx("<br\\s*/>");
         if (m_parts.at(index).contains(rx) && m_parts.at(index-2).contains(rx))
             m_parts[index] = "";
     }
@@ -96,7 +94,7 @@ void BtTextFilter::fixDoubleBR() {
 // Output:         <span class="footnote" note="ESV2011/Luke 11:37/1">1</span>
 
 int BtTextFilter::rewriteFootnoteAsLink(int i, const QString& part) {
-    if (i+2 > m_parts.count())
+    if (i + 2 >= m_parts.count())
         return 1;
 
     QRegExp rxlen("note=\"([^\"]*)");
@@ -119,7 +117,7 @@ int BtTextFilter::rewriteFootnoteAsLink(int i, const QString& part) {
 // Output:        <a href="sword://Bible/ESV2011/Luke 11:29||name=Luke11_29">
 
 int BtTextFilter::rewriteHref(int i, const QString& part) {
-    QRegExp rx1("<a\\s(\\w+)=\"([\\s\\S]*)\"\\s(\\w+)=\"([\\s\\S]*)\"");
+    QRegExp rx1("<a\\s+(\\w+)=\"([^\"]*)\"\\s+(\\w+)=\"([^\"]*)\"");
     rx1.setMinimal(false);
     int pos1 = rx1.indexIn(part);
     if (pos1 >= 0 && rx1.captureCount() == 4) {
@@ -137,6 +135,8 @@ int BtTextFilter::rewriteHref(int i, const QString& part) {
 // Typical input: <span lemma="H07225">God</span>
 // Output: "<a href="sword://lemmamorph/lemma=H0430||/God" style="color: black">"
 int BtTextFilter::rewriteLemmaOrMorphAsLink(int i, const QString& part) {
+    if (i + 2 >= m_parts.count())
+        return 1;
 
     QString value;
     QRegExp rx1("lemma=\"([^\"]*)*");
@@ -155,7 +155,7 @@ int BtTextFilter::rewriteLemmaOrMorphAsLink(int i, const QString& part) {
     QString refText = m_parts.at(i+1);
     QString url = "sword://lemmamorph/" + value + "/" + refText;
     QString newEntry;
-    newEntry = "<a id=lemmamorph href=\"" + url + "\">";
+    newEntry = "<a id=\"lemmamorph\" href=\"" + url + "\">";
     m_parts[i] = newEntry;
     m_parts[i+2] = "</a>";
     return 3;

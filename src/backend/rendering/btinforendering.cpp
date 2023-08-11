@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -12,28 +12,92 @@
 
 #include "btinforendering.h"
 
-#include <memory>
 #include <QStringList>
 #include <QtGlobal>
-#include <utility>
 #include "../../util/btassert.h"
 #include "../btglobal.h"
-#include "../drivers/cswordlexiconmoduleinfo.h"
-#include "../keys/cswordkey.h"
+#include "../keys/cswordversekey.h"
 #include "../managers/cdisplaytemplatemgr.h"
-#include "../managers/cswordbackend.h"
-#include "crossrefrendering.h"
+#include "../managers/referencemanager.h"
+#include "chtmlexportrendering.h"
+#include "../drivers/cswordlexiconmoduleinfo.h"
 
-// Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wextra-semi"
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
-#include <versekey.h>
-#pragma GCC diagnostic pop
 
+using namespace Rendering;
+using namespace sword;
 
 namespace Rendering {
+namespace {
+
+class CrossRefRendering : public CHTMLExportRendering {
+public:
+    CrossRefRendering(
+            const DisplayOptions &displayOptions = btConfig().getDisplayOptions(),
+            const FilterOptions &filterOptions = btConfig().getFilterOptions())
+        : CHTMLExportRendering(true, displayOptions, filterOptions)
+    {}
+
+    QString entryLink(const KeyTreeItem &item, const CSwordModuleInfo *module) override {
+        BT_ASSERT(module);
+
+        QString linkText;
+
+        const bool isBible = (module->type() == CSwordModuleInfo::Bible);
+        CSwordVerseKey vk(module); //only valid for bible modules, i.e. isBible == true
+        if (isBible) {
+            vk.setKey(item.key());
+        }
+
+        switch (item.settings().keyRenderingFace) {
+            case KeyTreeItem::Settings::NoKey:
+                linkText = QString();
+                break; //no key is valid for all modules
+            case KeyTreeItem::Settings::CompleteShort:
+                if (isBible) {
+                    linkText = QString::fromUtf8(vk.getShortText());
+                    break;
+                }
+                Q_FALLTHROUGH();
+            case KeyTreeItem::Settings::CompleteLong:
+                if (isBible) {
+                    linkText = vk.key();
+                    break;
+                }
+                Q_FALLTHROUGH();
+            case KeyTreeItem::Settings::SimpleKey:
+                if (isBible) {
+                    linkText = QString::number(vk.getVerse());
+                    break;
+                }
+                Q_FALLTHROUGH();
+            default: //default behaviour to return the passed key
+                linkText = item.key();
+                break;
+        }
+
+        if (!linkText.isEmpty()) { //if we have a valid link text
+            //     qWarning("rendering");
+            return QString("<a href=\"%1\">%2</a>")
+                   .arg(
+                       ReferenceManager::encodeHyperlink(
+                           module->name(),
+                           item.key(),
+                           ReferenceManager::typeFromModule(module->type())
+                       )
+                   )
+                   .arg(linkText);
+        }
+
+        return QString();
+    }
+
+    QString finishText(const QString &text, const KeyTree &tree) override {
+        Q_UNUSED(tree)
+        return text;
+    }
+}; // class CrossRefRendering
+
+} // anonymous namespace
 
 ListInfoData detectInfo(QString const & data) {
     ListInfoData list;
@@ -72,45 +136,49 @@ QString formatInfo(const ListInfoData & list,  BtConstModuleList const & modules
 
     QString text;
 
-    for (auto const & infoData : list) {
-        auto const & value = infoData.second;
-        switch (infoData.first) {
+    ListInfoData::const_iterator end = list.end();
+    for (ListInfoData::const_iterator it = list.begin(); it != end; ++it) {
+        switch ( (*it).first ) {
             case Lemma:
-                text.append(decodeStrongs(value));
+                text.append( decodeStrongs( (*it).second ) );
                 continue;
             case Morph:
-                text.append(decodeMorph(value));
+                text.append( decodeMorph( (*it).second ) );
                 continue;
             case CrossReference:
-                text.append(decodeCrossReference(value, modules));
+                text.append( decodeCrossReference( (*it).second, modules ) );
                 continue;
             case Footnote:
-                text.append(decodeFootnote(value));
+                text.append( decodeFootnote( (*it).second ) );
                 continue;
             case Abbreviation:
-                text.append(decodeAbbreviation(value));
+                text.append( decodeAbbreviation( (*it).second ) );
                 continue;
             case Text:
-                text.append(value);
+                text.append( (*it).second );
                 continue;
             case Reference:
-                if (value.contains("strongs:")) {
-                    auto v(value.right(value.size() - value.lastIndexOf('/')
-                                       - 1));
-                    if (value.contains("GREEK")) {
+                if((*it).second.contains("strongs:"))
+                {
+                    QString v = (*it).second.right((*it).second.size() -
+                        (*it).second.lastIndexOf('/') - 1);
+
+                    if((*it).second.contains("GREEK"))
                         v.prepend('G');
-                    } else if (value.contains("HEBREW")) {
+                    else if((*it).second.contains("HEBREW"))
                         v.prepend('H');
-                    } else {
+                    else
                         BT_ASSERT(false && "not implemented");
-                    }
+
                     text.append(decodeStrongs(v));
-                } else if (value.contains("sword:")) {
-                    text.append(decodeSwordReference(value));
-                    continue;
-                } else {
-                    BT_ASSERT(false); /// \todo Why is this here?
                 }
+                else if ((*it).second.contains("sword:"))
+                {
+                    text.append( decodeSwordReference( (*it).second ) );
+                    continue;
+                }
+                else
+                    BT_ASSERT(false); /// \todo Why is this here?
                 Q_FALLTHROUGH();
             default:
                 continue;
@@ -200,22 +268,27 @@ QString decodeCrossReference(QString const & data, BtConstModuleList const & mod
             sword::VerseKey * const vk = dynamic_cast<sword::VerseKey*>(key);
 
             if (vk && vk->isBoundSet()) { // render a range of keys
-                tree.emplace_back(
-                            QString::fromUtf8(vk->getLowerBound().getText()),
-                            QString::fromUtf8(vk->getUpperBound().getText()),
-                            module,
-                            settings);
+                tree.append(new CTextRendering::KeyTreeItem(
+                    QString::fromUtf8(vk->getLowerBound().getText()),
+                    QString::fromUtf8(vk->getUpperBound().getText()),
+                    module,
+                    settings
+                ));
             } else {
-                tree.emplace_back(QString::fromUtf8(key->getText()),
-                                  QString::fromUtf8(key->getText()),
-                                  module,
-                                  settings);
+                tree.append(new CTextRendering::KeyTreeItem(
+                    QString::fromUtf8(key->getText()),
+                    QString::fromUtf8(key->getText()),
+                    module,
+                    settings
+                ));
             }
         }
     } else if (module) {
-        tree.emplace_back(data.mid((pos == -1) ? 0 : pos + 1),
-                          module,
-                          settings);
+        tree.append(new CTextRendering::KeyTreeItem(data.mid((pos == -1)
+                                                             ? 0
+                                                             : pos + 1),
+                                                    module,
+                                                    settings));
     }
 
     // qWarning("rendered the tree: %s", renderer.renderKeyTree(tree).latin1());
@@ -278,7 +351,7 @@ QString decodeFootnote(QString const & data) {
 }
 
 CSwordModuleInfo * getFirstAvalibleStrongsModule (bool wantHebrew) {
-    for (auto * const m : CSwordBackend::instance()->moduleList()) {
+    Q_FOREACH(CSwordModuleInfo * m, CSwordBackend::instance()->moduleList()) {
         if (m->type() == CSwordLexiconModuleInfo::Lexicon) {
             auto lexModule = qobject_cast<CSwordLexiconModuleInfo *>(m);
             if (wantHebrew && m->has(CSwordModuleInfo::HebrewDef) && lexModule->hasStrongsKeys())
@@ -299,15 +372,18 @@ CSwordModuleInfo *  getStrongsModule (bool wantHebrew) {
 }
 
 QString decodeStrongs(QString const & data) {
+    QStringList strongs = data.split("|");
     QString ret;
-    for (auto const & strongs : data.split('|')) {
-        bool const wantHebrew = strongs.left(1) == "H";
+
+    QStringList::const_iterator end = strongs.end();
+    for (QStringList::const_iterator it = strongs.begin(); it != end; ++it) {
+        bool wantHebrew = (*it).left(1) == QString("H");
         CSwordModuleInfo * module = getStrongsModule(wantHebrew);
         QString text;
         if (module) {
             QSharedPointer<CSwordKey> key(CSwordKey::createInstance(module));
             auto lexModule = qobject_cast<CSwordLexiconModuleInfo *>(module);
-            key->setKey(lexModule->normalizeStrongsKey(strongs));
+            key->setKey(lexModule->normalizeStrongsKey(*it));
             text = key->renderedText();
         }
         //if the module could not be found just display an empty lemma info
@@ -319,7 +395,7 @@ QString decodeStrongs(QString const & data) {
             QString("<div class=\"strongsinfo\" lang=\"%1\"><h3>%2: %3</h3><p>%4</p></div>")
             .arg(lang)
             .arg(QObject::tr("Strongs"))
-            .arg(strongs)
+            .arg(*it)
             .arg(text)
         );
     }
@@ -330,7 +406,7 @@ QString decodeMorph(QString const & data) {
     QStringList morphs = data.split("|");
     QString ret;
 
-    for (auto const & morph : morphs) {
+    Q_FOREACH (QString morph, morphs) {
         //qDebug() << "CInfoDisplay::decodeMorph, morph: " << morph;
         CSwordModuleInfo * module = nullptr;
         bool skipFirstChar = false;
@@ -404,23 +480,31 @@ QString decodeMorph(QString const & data) {
 }
 
 QString decodeSwordReference(QString const & data) {
+    QString moduleName;
+    QString reference;
+    QString text;
+    CSwordModuleInfo * module = nullptr;
+
     QRegExp rx("sword://(bible|lexicon)/(.*)/(.*)", Qt::CaseInsensitive);
     rx.setMinimal(false);
-    if (rx.indexIn(data) >= 0) {
-        if (auto * const module =
-                    CSwordBackend::instance()->findModuleByName(rx.cap(2)))
-        {
-            std::unique_ptr<CSwordKey> key(CSwordKey::createInstance(module));
-            auto reference = rx.cap(3);
+    int pos1 = rx.indexIn(data);
+    if (pos1 > -1) {
+        moduleName = rx.cap(2);
+        reference = rx.cap(3);
+        module = CSwordBackend::instance()->findModuleByName(moduleName);
+        if (module) {
+            QSharedPointer<CSwordKey> key(CSwordKey::createInstance(module));
             key->setKey(reference);
-            return QString("<div class=\"crossrefinfo\" lang=\"%1\">"
-                           "<h3>%2</h3><p>%3</p></div>")
-                    .arg(module->language()->abbrev())
-                    .arg(std::move(reference))
-                    .arg(key->renderedText());
+            text = key->renderedText();
+        } else {
+            return "";
         }
     }
-    return {};
+
+    return QString("<div class=\"crossrefinfo\" lang=\"%1\"><h3>%2</h3><p>%3</p></div>")
+           .arg(module->language()->abbrev())
+           .arg(reference)
+           .arg(text);
 }
 
 } // namespace Rendering {

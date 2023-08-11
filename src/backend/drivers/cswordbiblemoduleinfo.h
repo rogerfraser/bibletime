@@ -2,19 +2,19 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CSWORDBIBLEMODULEINFO_H
+#define CSWORDBIBLEMODULEINFO_H
 
 #include "cswordmoduleinfo.h"
 
-#include <optional>
 #include <QStringList>
 #include "../keys/cswordversekey.h"
 
@@ -32,7 +32,9 @@ class CSwordBibleModuleInfo: public CSwordModuleInfo {
                               CSwordBackend & backend,
                               ModuleType type = Bible);
 
-        ~CSwordBibleModuleInfo() noexcept;
+        inline ~CSwordBibleModuleInfo() {
+            delete m_bookList;
+        }
 
         /**
           \returns the number of avalable verses for the given chapter and book.
@@ -63,7 +65,7 @@ class CSwordBibleModuleInfo: public CSwordModuleInfo {
         /**
           \returns a QStringList containing the books available in this module.
         */
-        QStringList const & books() const;
+        QStringList *books() const;
 
         /**
           \returns the index of the book given by its name.
@@ -74,7 +76,7 @@ class CSwordBibleModuleInfo: public CSwordModuleInfo {
         /**
           \returns whether this module has the Old Testament texts.
         */
-        bool hasOldTestament() const {
+        inline bool hasOldTestament() const {
             if (!m_boundsInitialized)
                 initBounds();
             return m_hasOT;
@@ -83,7 +85,7 @@ class CSwordBibleModuleInfo: public CSwordModuleInfo {
         /**
           \returns whether this module has the New Testament texts.
         */
-        bool hasNewTestament() const {
+        inline bool hasNewTestament() const {
             if (!m_boundsInitialized)
                 initBounds();
             return m_hasNT;
@@ -92,7 +94,7 @@ class CSwordBibleModuleInfo: public CSwordModuleInfo {
         /**
           \returns the key which represents the lower bound of this module.
         */
-        CSwordVerseKey const & lowerBound() const {
+        inline const CSwordVerseKey &lowerBound() const {
             if (!m_boundsInitialized)
                 initBounds();
             return m_lowerBound;
@@ -101,7 +103,7 @@ class CSwordBibleModuleInfo: public CSwordModuleInfo {
         /**
           \returns the key which represents the upper bound of this module.
         */
-        CSwordVerseKey const & upperBound() const {
+        inline const CSwordVerseKey &upperBound() const {
             if (!m_boundsInitialized)
                 initBounds();
             return m_upperBound;
@@ -119,6 +121,8 @@ class CSwordBibleModuleInfo: public CSwordModuleInfo {
         mutable bool m_hasOT;
         mutable bool m_hasNT;
 
-        mutable std::optional<QStringList> m_bookList; //This booklist is cached
+        mutable QStringList *m_bookList; //This booklist is cached
         mutable QString m_cachedLocale;
 };
+
+#endif

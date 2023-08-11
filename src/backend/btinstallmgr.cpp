@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -12,6 +12,8 @@
 
 #include "btinstallmgr.h"
 
+#include <type_traits>
+#include <utility>
 #include "../util/btassert.h"
 #include "btinstallbackend.h"
 
@@ -35,11 +37,25 @@ inline int calculateIntPercentage(T done, T total) {
     // Special care (see warning in BtInstallMgr::statusUpdate()).
     if (done > total)
         done = total;
-    if (total <= 0.0)
+    if (total == 0)
         return 100;
 
     return normalizeCompletionPercentage<int>((done / total) * 100);
 }
+
+template <typename ... Ts> struct MakeVoid { using type = void; };
+template <typename ... Ts> using VoidT = typename MakeVoid<Ts...>::type;
+
+template <typename T, class = void>
+struct TimeoutDisabler { void operator()(T &) const noexcept {} };
+
+template <typename T>
+struct TimeoutDisabler<T,
+        VoidT<decltype(std::declval<T &>().setTimeoutMillis(0))>>
+{
+    void operator()(T & obj) const noexcept
+    { obj.setTimeoutMillis(0); }
+};
 
 } // anonymous namespace
 
@@ -53,6 +69,7 @@ BtInstallMgr::BtInstallMgr(QObject * parent)
         , m_firstCallOfPreStatus(true)
 { // Use this class also as status reporter:
     this->setFTPPassive(true);
+    TimeoutDisabler<BtInstallMgr>()(*this);
 }
 
 BtInstallMgr::~BtInstallMgr() {
@@ -84,7 +101,7 @@ void BtInstallMgr::statusUpdate(double dltotal, double dlnow) {
     const int filePercent  = calculateIntPercentage(dlnow, dltotal);
 
     //qApp->processEvents();
-    Q_EMIT percentCompleted(totalPercent, filePercent);
+    emit percentCompleted(totalPercent, filePercent);
 }
 
 
@@ -92,11 +109,11 @@ void BtInstallMgr::preStatus(long totalBytes,
                              long completedBytes,
                              const char * message)
 {
-    Q_UNUSED(message)
+    Q_UNUSED(message);
     BT_ASSERT(completedBytes <= totalBytes);
     if (m_firstCallOfPreStatus) {
         m_firstCallOfPreStatus = false;
-        Q_EMIT downloadStarted();
+        emit downloadStarted();
     }
     m_completedBytes = completedBytes;
     m_totalBytes = totalBytes;

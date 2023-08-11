@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -13,33 +13,34 @@
 #include "crossrefrendering.h"
 
 #include <QtGlobal>
-#include "../../util/btassert.h"
-#include "../drivers/cswordmoduleinfo.h"
-#include "../keys/cswordversekey.h"
-#include "../managers/referencemanager.h"
+#include "../backend/drivers/cswordmoduleinfo.h"
+#include "../backend/keys/cswordversekey.h"
+#include "../backend/managers/referencemanager.h"
+#include "../util/btassert.h"
 
 
-namespace Rendering {
+namespace InfoDisplay {
 
 CrossRefRendering::CrossRefRendering(const DisplayOptions &displayOptions,
                                      const FilterOptions &filterOptions)
-        : CTextRendering(true, displayOptions, filterOptions)
+        : CHTMLExportRendering(true, displayOptions, filterOptions)
 {
     // Intentionally empty
 }
 
 QString CrossRefRendering::finishText(const QString &text, const KeyTree &tree) {
-    Q_UNUSED(tree)
+    Q_UNUSED(tree);
     return text;
 }
 
-QString CrossRefRendering::entryLink(KeyTreeItem const & item,
-                                     CSwordModuleInfo const & module)
+QString CrossRefRendering::entryLink(const KeyTreeItem &item,
+                                     const CSwordModuleInfo *module)
 {
+    BT_ASSERT(module);
     QString linkText;
 
-    const bool isBible = (module.type() == CSwordModuleInfo::Bible);
-    CSwordVerseKey vk(&module); // only valid for bible modules, i.e. isBible == true
+    const bool isBible = (module->type() == CSwordModuleInfo::Bible);
+    CSwordVerseKey vk(module); //only valid for bible modules, i.e. isBible == true
     if (isBible) {
         vk.setKey(item.key());
     }
@@ -50,7 +51,7 @@ QString CrossRefRendering::entryLink(KeyTreeItem const & item,
             break; //no key is valid for all modules
         case KeyTreeItem::Settings::CompleteShort:
             if (isBible) {
-                linkText = vk.shortText();
+                linkText = QString::fromUtf8(vk.getShortText());
                 break;
             }
             //fall through for non-Bible modules
@@ -64,7 +65,7 @@ QString CrossRefRendering::entryLink(KeyTreeItem const & item,
             Q_FALLTHROUGH();
         case KeyTreeItem::Settings::SimpleKey:
             if (isBible) {
-                linkText = QString::number(vk.verse());
+                linkText = QString::number(vk.getVerse());
                 break;
             }
             //fall through for non-Bible modules
@@ -78,11 +79,17 @@ QString CrossRefRendering::entryLink(KeyTreeItem const & item,
     if (!linkText.isEmpty()) { //if we have a valid link text
         //     qWarning("rendering");
         return QString("<a href=\"%1\">%2</a>")
-               .arg(ReferenceManager::encodeHyperlink(module, item.key()))
+               .arg(
+                   ReferenceManager::encodeHyperlink(
+                       module->name(),
+                       item.key(),
+                       ReferenceManager::typeFromModule(module->type())
+                   )
+               )
                .arg(linkText);
     }
 
     return QString();
 }
 
-} // namespace Rendering
+}

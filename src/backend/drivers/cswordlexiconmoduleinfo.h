@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CSWORDLEXICONMODULEINFO_H
+#define CSWORDLEXICONMODULEINFO_H
 
 #include "cswordmoduleinfo.h"
 
@@ -24,8 +25,8 @@ class CSwordLexiconModuleInfo: public CSwordModuleInfo {
         Q_OBJECT
 
     public: /* Methods: */
-        CSwordLexiconModuleInfo(sword::SWModule & module,
-                                CSwordBackend & backend)
+        inline CSwordLexiconModuleInfo(sword::SWModule & module,
+                                       CSwordBackend & backend)
                 : CSwordModuleInfo(module, backend, Lexicon),
                 m_hasStrongsKeys(false),
                 m_hasLeadingStrongsLetter(false),
@@ -54,8 +55,12 @@ class CSwordLexiconModuleInfo: public CSwordModuleInfo {
         */
         const QStringList &entries() const;
 
-        /** Jumps to the closest entry in the module. */
-        bool snap() const override;
+        /**
+          Jumps to the closest entry in the module.
+        */
+        inline bool snap() const override {
+            return module().getRawEntry();
+        }
 
     private: /* Fields: */
 
@@ -75,3 +80,5 @@ class CSwordLexiconModuleInfo: public CSwordModuleInfo {
         */
         mutable QStringList m_entries;
 };
+
+#endif

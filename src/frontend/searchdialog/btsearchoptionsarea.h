@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTSEARCHOPTIONSAREA_H
+#define BTSEARCHOPTIONSAREA_H
 
 #include <QWidget>
 
@@ -53,12 +54,14 @@ class BtSearchOptionsArea : public QWidget {
 
         CSwordModuleSearch::SearchType searchType();
 
-        QPushButton * searchButton() const { return m_searchButton; }
+        inline QPushButton * searchButton() const { return m_searchButton; }
 
         /**
           Returns the list of used modules.
         */
-        BtConstModuleList const & modules() const { return m_modules; }
+        inline const BtConstModuleList & modules() const {
+            return m_modules;
+        }
 
         /**
         * Sets all options back to the default.
@@ -68,6 +71,9 @@ class BtSearchOptionsArea : public QWidget {
         * Returns the selected search scope if a search scope was selected.
         */
         sword::ListKey searchScope();
+
+        bool hasSearchScope();
+
 
     protected:
         /**
@@ -85,7 +91,7 @@ class BtSearchOptionsArea : public QWidget {
         void saveSettings();
         bool eventFilter(QObject* obj, QEvent* event) override;
 
-    public Q_SLOTS:
+    public slots:
         /**
           Sets the modules used by the search.
         */
@@ -94,6 +100,8 @@ class BtSearchOptionsArea : public QWidget {
           Get unique works list from the Works combobox
         */
         QStringList getUniqueWorksList();
+        /** Sets the modules when user selects them from the combobox.*/
+        void moduleListTextSelected(int index);
 
         /**
         * Reimplementation.
@@ -108,14 +116,13 @@ class BtSearchOptionsArea : public QWidget {
          */
         void chooseModules();
 
-    protected Q_SLOTS:
-
-        /// \todo Implement validation
-        #if 0
+    protected slots:
+        void setupRanges();
+        void syntaxHelp();
+        void slotSearchTextEditReturnPressed();
         void slotValidateText(const QString& newText);
-        #endif
 
-    Q_SIGNALS:
+    signals:
         void sigSetSearchButtonStatus(bool);
         void sigStartSearch();
 
@@ -142,3 +149,6 @@ class BtSearchOptionsArea : public QWidget {
 };
 
 }
+
+
+#endif

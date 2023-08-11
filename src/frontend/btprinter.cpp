@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -19,6 +19,7 @@
 #include "../backend/keys/cswordversekey.h"
 #include "../backend/managers/cdisplaytemplatemgr.h"
 #include "../util/btassert.h"
+#include "bibletime.h"
 
 
 namespace {
@@ -52,16 +53,17 @@ void BtPrinter::printKeyTree(KeyTree const & tree) {
 }
 
 QString BtPrinter::entryLink(KeyTreeItem const & item,
-                             CSwordModuleInfo const & module)
+                             CSwordModuleInfo const * module)
 {
-    if (module.type() != CSwordModuleInfo::Bible)
+    BT_ASSERT(module);
+    if (module->type() != CSwordModuleInfo::Bible)
         return item.key();
 
-    CSwordVerseKey vk(&module);
+    CSwordVerseKey vk(module);
     vk.setKey(item.key());
     switch (item.settings().keyRenderingFace) {
         case KeyTreeItem::Settings::CompleteShort:
-            return vk.shortText();
+            return QString::fromUtf8(vk.getShortText());
 
         case KeyTreeItem::Settings::CompleteLong:
             return vk.key();
@@ -71,12 +73,13 @@ QString BtPrinter::entryLink(KeyTreeItem const & item,
 
         case KeyTreeItem::Settings::SimpleKey: // fall through:
         default:
-            return QString::number(vk.verse());
+            return QString::number(vk.getVerse());
     }
 }
 
 QString BtPrinter::renderEntry(KeyTreeItem const & i, CSwordKey * key) {
-    Q_UNUSED(key)
+    Q_UNUSED(key);
+    BT_ASSERT(dynamic_cast<BtPrinter::KeyTreeItem const *>(&i));
     BtPrinter::KeyTreeItem const * const printItem =
             static_cast<BtPrinter::KeyTreeItem const *>(&i);
 
@@ -85,9 +88,9 @@ QString BtPrinter::renderEntry(KeyTreeItem const & i, CSwordKey * key) {
                 QString::fromLatin1("<div class=\"entry\"><div class=\""
                                     "rangeheading\">%1</div>").arg(
                                             printItem->getAlternativeContent());
-        if (!i.childList().empty())
-            for (auto const & item : i.childList())
-                ret.append(CDisplayRendering::renderEntry(item));
+        if (!i.childList()->isEmpty())
+            Q_FOREACH (const KeyTreeItem * const c, *i.childList())
+                ret.append(CDisplayRendering::renderEntry(*c));
         ret.append("</div>");
         return ret;
     }
@@ -98,11 +101,14 @@ QString BtPrinter::finishText(QString const & text, KeyTree const & tree) {
     BtConstModuleList const modules = collectModules(tree);
     BT_ASSERT(!modules.empty());
 
+    CLanguageMgr::Language const * const lang = modules.first()->language();
+    BT_ASSERT(lang);
+
     CDisplayTemplateMgr::Settings settings;
     //settings.modules = modules;
     settings.pageCSS_ID = "printer";
-    if (modules.count() == 1)
-        settings.langAbbrev = modules.first()->language()->abbrev();
+    if (modules.count() == 1 && lang->isValid())
+        settings.langAbbrev = lang->abbrev();
 
     if (modules.count() == 1)
         settings.textDirection = modules.first()->textDirection();

@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CBOOKTREECHOOSER_H
+#define CBOOKTREECHOOSER_H
 
 #include "ckeychooser.h"
 
@@ -18,52 +19,60 @@
 #include "ckeychooserwidget.h"
 
 
-class BTHistory;
+namespace sword {
+class TreeKeyIdx;
+}
 class CSwordBookModuleInfo;
 class CSwordKey;
 class QTreeWidget;
 class QTreeWidgetItem;
+class BTHistory;
 
-class CBookTreeChooser final : public CKeyChooser {
+/** The keychooser implementation for books.
+  * @author The BibleTime team
+  */
+class CBookTreeChooser : public CKeyChooser {
+        Q_OBJECT
+    public:
+        CBookTreeChooser(const BtConstModuleList &modules,
+                         BTHistory *history, CSwordKey *key = nullptr,
+                         QWidget *parent = nullptr);
 
-    Q_OBJECT
+        void refreshContent() override;
 
-public: /* Methods: */
+        void setModules(const BtConstModuleList &modules,
+                        bool refresh = true) override;
 
-    CBookTreeChooser(BtConstModuleList const & modules,
-                     BTHistory * history,
-                     CSwordKey * key = nullptr,
-                     QWidget * parent = nullptr);
+        inline CSwordKey *key() override {
+            return m_key;
+        }
 
-    void refreshContent() final override;
-    void setModules(BtConstModuleList const & modules,
-                    bool refresh = true) final override;
+        void setKey(CSwordKey *key) override;
 
-    CSwordKey * key() final override { return m_key; }
-    void setKey(CSwordKey * key) final override;
-    void setKey(CSwordKey *, const bool emitSinal);
 
-public Q_SLOTS:
+        void setKey(CSwordKey*, const bool emitSinal);
 
-    void updateKey(CSwordKey *) final override;
-    void doShow();
+    public slots: // Public slots
+        void updateKey( CSwordKey* ) override;
 
-private: /* Methods: */
+        void doShow();
 
-    /** \brief Creates the first level of the tree structure. */
-    void setupTree();
-    void addKeyChildren(CSwordTreeKey * key, QTreeWidgetItem * item);
-    void adjustFont();
-    void handleHistoryMoved(QString const & newKey) final override;
+    protected: // Protected methods
+        /**
+        * Creates the first level of the tree structure.
+        */
+        void setupTree();
+        void adjustFont() override;
+        void addKeyChildren(CSwordTreeKey* key, QTreeWidgetItem* item);
 
-private Q_SLOTS:
+    protected slots: // Protected slots
+        void itemActivated( QTreeWidgetItem* item );
+        void setKey(const QString & newKey) override;
 
-    void itemActivated(QTreeWidgetItem * item);
+    private:
+        QList<const CSwordBookModuleInfo*> m_modules;
+        CSwordTreeKey* m_key;
+        QTreeWidget* m_treeView;
+};
 
-private: /* Fields: */
-
-    QList<CSwordBookModuleInfo const *> m_modules;
-    CSwordTreeKey * m_key;
-    QTreeWidget * m_treeView;
-
-}; /* class CBookTreeChooser */
+#endif

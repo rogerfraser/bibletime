@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef ITEM_H
+#define ITEM_H
 
 #include <QList>
 #include <QVariant>
@@ -35,7 +36,7 @@ public: /* Types: */
 
 public: /* Methods: */
 
-    Item(Type type)
+    inline Item(Type type)
         : m_type(type)
         , m_parent(nullptr)
         , m_checkState(Qt::Unchecked) {}
@@ -45,24 +46,30 @@ public: /* Methods: */
     /**
       \brief Returns the type of this item.
     */
-    Type type() const { return m_type; }
+    inline Type type() const {
+        return m_type;
+    }
 
     /**
       \brief Returns a pointer to the parent item of this item.
       \retval 0 if this item has no parent.
     */
-    Item * parent() const { return m_parent; }
+    inline Item * parent() const {
+        return m_parent;
+    }
 
     /**
       \brief Returns the list of child items of this node.
     */
-    QList<Item *> & children() { return m_children; }
+    inline QList<Item *> & children() {
+        return m_children;
+    }
 
     /**
       \brief Returns the index of this item under its parent.
       \retval -1 if this item has no parent.
     */
-    int childIndex() const {
+    inline int childIndex() const {
         return m_parent == nullptr
                ? -1
                : m_parent->m_children.indexOf(const_cast<Item *>(this));
@@ -73,7 +80,7 @@ public: /* Methods: */
              inserted.
       \param[in] newItem Pointer to the item that would be inserted.
     */
-    int indexFor(Item const & newItem);
+    int indexFor(Item * newItem);
 
     /**
       \brief Inserts the given item as a child at the given index.
@@ -81,7 +88,7 @@ public: /* Methods: */
       \param[in] index The child index to insert the item at.
       \param[in] newItem The item to insert.
     */
-    void insertChild(int index, Item * newItem) {
+    inline void insertChild(int index, Item * newItem) {
         BT_ASSERT(newItem);
         BT_ASSERT(index >= 0 && index <= m_children.size());
         m_children.insert(index, newItem);
@@ -89,7 +96,7 @@ public: /* Methods: */
     }
 
     template <class T>
-    T * getGroupItem(CSwordModuleInfo & module, int & outIndex) {
+    inline T * getGroupItem(CSwordModuleInfo & module, int & outIndex) {
         for (int i = 0; i < m_children.size(); i++) {
             BT_ASSERT(m_children.at(i)->type() == T::staticItemType());
             T * item = static_cast<T *>(m_children.at(i));
@@ -109,13 +116,17 @@ public: /* Methods: */
     /**
       \brief Returns the check state of this item.
     */
-    Qt::CheckState checkState() const { return m_checkState; }
+    inline Qt::CheckState checkState() const {
+        return m_checkState;
+    }
 
     /**
       \brief Sets the check state of this item.
       \param[in] state new check state.
     */
-    void setCheckState(const Qt::CheckState state) { m_checkState = state; }
+    inline void setCheckState(const Qt::CheckState state) {
+        m_checkState = state;
+    }
 
     /**
       \brief Returns whether this item is fit to contain the given module.
@@ -123,7 +134,7 @@ public: /* Methods: */
       \retval true If this item is a group and can contain the given module.
       \retval false This item is not a group or is a wrong group.
     */
-    virtual bool fitFor(const CSwordModuleInfo & module) const = 0;
+    inline virtual bool fitFor(const CSwordModuleInfo & module) const = 0;
 
     /**
       \brief Comparsion operator used sorting child items.
@@ -132,7 +143,7 @@ public: /* Methods: */
 
 private: /* Methods: */
 
-    void setParent(Item * parent) noexcept
+    inline void setParent(Item * parent) noexcept
     { m_parent = (static_cast<void>(BT_ASSERT(parent)), parent); }
 
 private: /* Fields: */
@@ -148,7 +159,8 @@ class RootItem: public Item {
 
 public: /* Methods: */
 
-    RootItem() : Item(Item::ITEM_ROOT) {}
+    inline RootItem()
+        : Item(Item::ITEM_ROOT) {}
 
     bool fitFor(const CSwordModuleInfo &) const override;
 
@@ -159,10 +171,15 @@ class GroupItem: public Item {
 
 public: /* Methods: */
 
-    GroupItem() : Item(TYPE) {}
+    inline GroupItem()
+        : Item(TYPE) {}
 
-    static Item::Type staticItemType() { return TYPE; }
+    inline static Item::Type staticItemType() {
+        return TYPE;
+    }
 
 };
 
 } // Namespace BookshelfModel
+
+#endif // ITEM_H

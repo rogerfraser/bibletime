@@ -2,25 +2,22 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTINSTALLMGR_H
+#define BTINSTALLMGR_H
 
 #include <QObject>
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wextra-semi"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <installmgr.h>
 #include <remotetrans.h>
-#pragma GCC diagnostic pop
 
 
 /**
@@ -29,7 +26,7 @@
 class BtInstallMgr
         : public QObject
         , public sword::InstallMgr
-        , private sword::StatusReporter
+        , public sword::StatusReporter
 {
 
     Q_OBJECT
@@ -41,7 +38,7 @@ public: /* Methods: */
 
     bool isUserDisclaimerConfirmed() const override;
 
-Q_SIGNALS:
+signals:
 
     /**
       Download status. Percent of total and file.
@@ -74,3 +71,5 @@ private: /* Fields: */
     bool m_firstCallOfPreStatus;
 
 };
+
+#endif /* BTINSTALLMGR_H */

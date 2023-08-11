@@ -2,42 +2,44 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CSWORDMODULEINFO_H
+#define CSWORDMODULEINFO_H
 
 #include <QObject>
+#include "btdisplayholder.h"
+
+#include "../managers/clanguagemgr.h"
 
 #include <atomic>
-#include <memory>
 #include <QIcon>
+#include <QList>
 #include <QMetaType>
 #include <QString>
-#include <vector>
-#include "../cswordmodulesearch.h"
-#include "../language.h"
+
+// Sword includes:
+#include <listkey.h>
+#include <swmodule.h>
+#include <swsearchable.h>
+#include <swversion.h>
 
 
+#ifdef CLUCENE2
 // CLucene no longer lists the following functions in its headers
 extern size_t lucene_utf8towcs(wchar_t *, const char *,  size_t maxslen);
 extern size_t lucene_wcstoutf8 (char *,  const wchar_t *, size_t maxslen);
+#endif
 
 class CSwordBackend;
 class CSwordKey;
-namespace sword {
-class ListKey;
-class SWKey;
-class SWModule;
-class SWVersion;
-} // namespace sword
 
-namespace Rendering { class CEntryDisplay; }
 
 /**
  * Base class for Sword modules.
@@ -48,7 +50,10 @@ namespace Rendering { class CEntryDisplay; }
  * @version $Id: cswordmoduleinfo.h,v 1.83 2007/02/04 23:12:32 joachim Exp $
  */
 
-class CSwordModuleInfo: public QObject {
+class CSwordModuleInfo
+    : public QObject
+    , public BtDisplayHolder<CSwordModuleInfo>
+{
 
     Q_OBJECT
 
@@ -84,11 +89,11 @@ public: /* Types: */
 
     /** The module type. */
     enum ModuleType {
-        Unknown, /**< Fall back type for unknown modules */
         Bible, /**< Bible module */
         Commentary, /**< Commentary module */
         Lexicon, /**< Lexicon module */
         GenericBook, /**< Generic book module */
+        Unknown /**< Fall back type for unknown modules */
     };
 
     /**
@@ -161,11 +166,6 @@ public: /* Methods: */
     CSwordModuleInfo & operator=(CSwordModuleInfo &&) = delete;
     CSwordModuleInfo & operator=(CSwordModuleInfo const &) = delete;
 
-    void setDisplay(Rendering::CEntryDisplay * display = nullptr) noexcept
-    { m_display = display; }
-
-    Rendering::CEntryDisplay * getDisplay() const noexcept { return m_display; }
-
     /**
     * Returns the base directory for search indices
     */
@@ -190,7 +190,9 @@ public: /* Methods: */
     /**
     * Returns the module object so all objects can access the original Sword module.
     */
-    sword::SWModule & module() const { return m_module; }
+    inline sword::SWModule & module() const {
+        return m_module;
+    }
 
     /**
     * Sets the unlock key of the modules and writes the key into the config file.
@@ -233,7 +235,9 @@ wrong, or if the config file was write protected return false.
       \retval true if this module has a version number
       \retval false if it doesn't have a version number
     */
-    bool hasVersion() const { return m_cachedHasVersion; }
+    inline bool hasVersion() const {
+        return m_cachedHasVersion;
+    }
 
     /**
       \returns true if the module's index has been built.
@@ -262,18 +266,21 @@ wrong, or if the config file was write protected return false.
     size_t indexSize() const;
 
     /**
-      This function uses CLucene to perform and index based search.
-      \returns the result
+      This function uses CLucene to perform and index based search. It also
+      overwrites the variable containing the last search result.
+      \returns the number of results found
       \throws on error
     */
-    CSwordModuleSearch::ModuleResultList
-    searchIndexed(QString const & searchedText,
-                  sword::ListKey const & scope) const;
+    size_t searchIndexed(const QString & searchedText,
+                         const sword::ListKey & scope,
+                         sword::ListKey & results) const;
 
     /**
       \returns the type of the module.
     */
-    ModuleType type() const { return m_type; }
+    inline ModuleType type() const {
+        return m_type;
+    }
 
     /**
     * Returns the required Sword version for this module.
@@ -286,13 +293,17 @@ wrong, or if the config file was write protected return false.
             after each duplicate.
       \returns The name of this module.
     */
-    QString const & name() const { return m_cachedName; }
+    inline const QString & name() const {
+        return m_cachedName;
+    }
 
     /**
     * Snaps to the closest entry in the module if the current key is
     * not present in the data files.
     */
-    virtual bool snap() const { return false; }
+    virtual inline bool snap() const {
+        return false;
+    }
 
     /**
       \returns whether the module supports the feature given as parameter.
@@ -321,22 +332,23 @@ wrong, or if the config file was write protected return false.
     /**
       \returns the language of the module.
     */
-    std::shared_ptr<Language const> language() const
-    { return m_cachedLanguage; }
-
-    /** \returns the target language of the glossary, if this is a glossary. */
-    std::shared_ptr<Language const> glossaryTargetlanguage() const
-    { return m_cachedGlossaryTargetLanguage; }
+    inline const CLanguageMgr::Language * language() const {
+        return m_cachedLanguage;
+    }
 
     /**
       \returns whether this module may be written to.
     */
-    virtual bool isWritable() const { return false; }
+    inline virtual bool isWritable() const {
+        return false;
+    }
 
     /**
     * Returns true if this module is hidden (not to be shown with other modules in certain views).
     */
-    bool isHidden() const { return m_hidden; }
+    inline bool isHidden() const {
+        return m_hidden;
+    }
 
     /**
       Shows or hides the module.
@@ -348,7 +360,9 @@ wrong, or if the config file was write protected return false.
     /**
       \returns the category of this module.
     */
-    CSwordModuleInfo::Category category() const { return m_cachedCategory; }
+    inline CSwordModuleInfo::Category category() const {
+        return m_cachedCategory;
+    }
 
     /**
     * The about text which belongs to this module.
@@ -359,12 +373,16 @@ wrong, or if the config file was write protected return false.
     * Returns true if this module is Unicode encoded. False if the charset is iso8859-1.
     * Protected because it should not be used outside of the CSword*ModuleInfo classes.
     */
-    bool isUnicode() const noexcept;
+    inline bool isUnicode() const {
+        return m_module.isUnicode();
+    }
 
     /**
       Returns an icon for this module.
     */
-    QIcon moduleIcon() const { return CSwordModuleInfo::moduleIcon(*this); }
+    inline QIcon moduleIcon() const {
+        return CSwordModuleInfo::moduleIcon(*this);
+    }
 
     /**
       Returns an icon for the given module.
@@ -390,10 +408,10 @@ wrong, or if the config file was write protected return false.
     */
     static QString englishCategoryName(const CSwordModuleInfo::Category & category);
 
-public Q_SLOTS:
+public slots:
 
-    void cancelIndexing(std::memory_order const memoryOrder =
-                                std::memory_order_relaxed) noexcept
+    inline void cancelIndexing(std::memory_order const memoryOrder =
+                                        std::memory_order_relaxed) noexcept
     { m_cancelIndexing.store(true, memoryOrder); }
 
 protected: /* Methods: */
@@ -402,7 +420,9 @@ protected: /* Methods: */
                      CSwordBackend & backend,
                      ModuleType type);
 
-    CSwordBackend & backend() const { return m_backend; }
+    inline CSwordBackend & backend() const {
+        return m_backend;
+    }
 
     QString getSimpleConfigEntry(const QString & name) const;
     QString getFormattedConfigEntry(const QString & name) const;
@@ -410,7 +430,7 @@ protected: /* Methods: */
     bool hasImportantFilterOption() const;
     void setImportantFilterOptions(bool enable);
 
-Q_SIGNALS:
+signals:
 
     void hasIndexChanged(bool hasIndex);
     void hiddenChanged(bool hidden);
@@ -420,7 +440,6 @@ Q_SIGNALS:
 
 private: /* Fields: */
 
-    Rendering::CEntryDisplay * m_display = nullptr;
     sword::SWModule & m_module;
     CSwordBackend & m_backend;
     ModuleType const m_type;
@@ -430,11 +449,12 @@ private: /* Fields: */
     // Cached data:
     QString const m_cachedName;
     CSwordModuleInfo::Category const m_cachedCategory;
-    std::shared_ptr<Language const> const m_cachedLanguage;
-    std::shared_ptr<Language const> const m_cachedGlossaryTargetLanguage;
+    const CLanguageMgr::Language * const m_cachedLanguage;
     bool const m_cachedHasVersion;
 
 };
 
 Q_DECLARE_METATYPE(CSwordModuleInfo::Category);
 Q_DECLARE_OPERATORS_FOR_FLAGS(CSwordModuleInfo::Categories)
+
+#endif

@@ -2,35 +2,33 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BT_MODULECHOOSERBAR
+#define BT_MODULECHOOSERBAR
 
 #include "../../backend/drivers/cswordmoduleinfo.h"
 #include "btwindowmodulechooser.h"
 #include <QToolBar>
 #include <QStringList>
 
-class CDisplayWindow;
+class CReadWindow;
 class BtModuleChooserButton;
 
 class BtModuleChooserBar: public QToolBar, public BtWindowModuleChooser {
         Q_OBJECT
     public:
         BtModuleChooserBar(QWidget* parent);
-
         /** Initialize with module list.*/
-        void setModules(QStringList useModules,
-                        CSwordModuleInfo::ModuleType type,
-                        CDisplayWindow * window);
+        void setModules( QStringList useModules,CSwordModuleInfo::ModuleType type, CReadWindow* window);
 
-    public Q_SLOTS:
+    public slots:
         /**
         * The backend module list was updated, module list and widgets must be updated.
         * The signal comes from the window, not from the backend. The new list can
@@ -56,7 +54,9 @@ class BtModuleChooserBar: public QToolBar, public BtWindowModuleChooser {
 
     private:
         int m_idCounter;
-        CDisplayWindow * m_window;
+        CReadWindow* m_window;
         CSwordModuleInfo::ModuleType m_moduleType;
         QList<BtModuleChooserButton*> m_buttonList;
 };
+
+#endif

@@ -2,15 +2,13 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
-
-#pragma once
 
 /**
   This class is part of the view implementation for the model/view read display.
@@ -18,13 +16,17 @@
   the scrolling for the view.
   */
 
-#include <QWidget>
 
+#ifndef BTQMLSCROLLVIEW_H
+#define BTQMLSCROLLVIEW_H
+
+#include <QWidget>
 
 class BtQuickWidget;
 class BtTextFilter;
 class BtQmlInterface;
-class BtModelViewReadDisplay;
+class BtConstModuleList;
+class CReadDisplay;
 class CSwordModuleInfo;
 class CSwordKey;
 struct FilterOptions;
@@ -35,7 +37,7 @@ class BtQmlScrollView : public QWidget {
     Q_OBJECT
 public:
 
-    BtQmlScrollView(QWidget * parent, BtModelViewReadDisplay * readDisplay);
+    BtQmlScrollView(QWidget * parent, CReadDisplay* readDisplay);
     ~BtQmlScrollView() override;
 
     /** hightlight text */
@@ -63,19 +65,21 @@ protected:
     virtual void	resizeEvent(QResizeEvent *event) override;
     void contextMenuEvent(QContextMenuEvent* event) override;
 
-private Q_SLOTS:
+private slots:
     void slotSliderMoved(int value);
     void slotSliderPressed();
     void slotSliderReleased();
 
-Q_SIGNALS:
+signals:
     void referenceDropped(const QString& reference);
 
 private:    void initScrollBar();
 
-    BtModelViewReadDisplay * m_readDisplay;
+    CReadDisplay* m_readDisplay;
     BtQmlInterface* m_qmlInterface;
     BtQuickWidget* m_quickWidget;
     QScrollBar* m_scrollBar;
     int m_scrollBarPosition;
 };
+
+#endif

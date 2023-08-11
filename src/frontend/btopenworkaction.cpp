@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -12,7 +12,6 @@
 
 #include "btopenworkaction.h"
 
-#include <utility>
 #include "../backend/bookshelfmodel/btbookshelffiltermodel.h"
 #include "../backend/managers/cswordbackend.h"
 #include "../util/btconnect.h"
@@ -21,38 +20,27 @@
 #include "btbookshelfgroupingmenu.h"
 
 
-BtOpenWorkActionMenu::BtOpenWorkActionMenu(BtConfigCore groupingConfigGroup,
-                                           QString groupingConfigKey,
-                                           QWidget * parent)
+BtOpenWorkActionMenu::BtOpenWorkActionMenu(const QString &groupingConfigKey,
+                                           QWidget *parent)
     : BtMenuView(parent)
     , m_treeModel(nullptr)
     , m_postFilterModel(nullptr)
     , m_groupingMenu(nullptr)
-    , m_groupingConfigGroup(std::move(groupingConfigGroup))
-    , m_groupingConfigKey(std::move(groupingConfigKey))
+    , m_groupingConfigKey(groupingConfigKey)
 {
     // Setup models:
-    m_treeModel = new BtBookshelfTreeModel(m_groupingConfigGroup,
-                                           m_groupingConfigKey,
-                                           this);
+    m_treeModel = new BtBookshelfTreeModel(groupingConfigKey, this);
     m_postFilterModel = new BtBookshelfFilterModel(this);
     m_postFilterModel->setSourceModel(m_treeModel);
     setModel(m_postFilterModel);
 
-    BT_CONNECT(this, &BtMenuView::triggered,
-               [this](QModelIndex const & index) {
-                   static constexpr auto const MPR =
-                           BtBookshelfModel::ModulePointerRole;
-                   if (auto * const i =
-                            static_cast<CSwordModuleInfo *>(
-                                    model()->data(index, MPR).value<void *>()))
-                       Q_EMIT triggered(i);
-               });
+    BT_CONNECT(this, SIGNAL(triggered(QModelIndex)),
+               this, SLOT(slotIndexTriggered(QModelIndex)));
 }
 
-void BtOpenWorkActionMenu::setSourceModel(
-        std::shared_ptr<QAbstractItemModel> model)
-{ m_treeModel->setSourceModel(std::move(model)); }
+void BtOpenWorkActionMenu::setSourceModel(QAbstractItemModel *model) {
+    m_treeModel->setSourceModel(model);
+}
 
 void BtOpenWorkActionMenu::retranslateUi() {
     if (!m_groupingMenu)
@@ -63,50 +51,59 @@ void BtOpenWorkActionMenu::retranslateUi() {
 }
 
 void BtOpenWorkActionMenu::postBuildMenu(QActionGroup * actions) {
-    Q_UNUSED(actions)
+    Q_UNUSED(actions);
     addSeparator();
     m_groupingMenu = new BtBookshelfGroupingMenu(false, this);
 
     BT_CONNECT(m_groupingMenu,
-               &BtBookshelfGroupingMenu::signalGroupingOrderChanged,
-               [this](BtBookshelfTreeModel::Grouping const & grouping) {
-                   m_treeModel->setGroupingOrder(grouping);
-                   grouping.saveTo(m_groupingConfigGroup, m_groupingConfigKey);
-               });
+               SIGNAL(signalGroupingOrderChanged(
+                              BtBookshelfTreeModel::Grouping)),
+               this,
+               SLOT(slotGroupingActionTriggered(
+                            BtBookshelfTreeModel::Grouping)));
 
     retranslateUi();
     addMenu(m_groupingMenu);
 }
 
-BtOpenWorkAction::BtOpenWorkAction(BtConfigCore groupingConfigGroup,
-                                   QString groupingConfigKey,
-                                   QObject * parent)
+void BtOpenWorkActionMenu::slotIndexTriggered(const QModelIndex &index) {
+    static const int MPR = BtBookshelfModel::ModulePointerRole;
+
+    CSwordModuleInfo *i;
+    i = static_cast<CSwordModuleInfo *>(model()->data(index, MPR).value<void*>());
+    if (i != nullptr) {
+        emit triggered(i);
+    }
+}
+
+void BtOpenWorkActionMenu::slotGroupingActionTriggered(const BtBookshelfTreeModel::Grouping &grouping) {
+    m_treeModel->setGroupingOrder(grouping);
+    grouping.saveTo(m_groupingConfigKey);
+}
+
+BtOpenWorkAction::BtOpenWorkAction(const QString &groupingConfigKey,
+                                   QObject *parent)
     : QAction(parent)
 {
-    m_menu = new BtOpenWorkActionMenu(std::move(groupingConfigGroup),
-                                      std::move(groupingConfigKey));
+    m_menu = new BtOpenWorkActionMenu(groupingConfigKey);
     m_menu->setSourceModel(CSwordBackend::instance()->model());
 
     setMenu(m_menu);
     setIcon(CResMgr::mainWindow::icon_openAction());
     retranslateUi();
-
-    auto slotModelChanged =
-            [this]{ setEnabled(m_menu->postFilterModel()->rowCount() > 0); };
-
     slotModelChanged();
 
     BtBookshelfFilterModel *filterModel = m_menu->postFilterModel();
-    BT_CONNECT(m_menu, &BtOpenWorkActionMenu::triggered,
-               this,   &BtOpenWorkAction::triggered);
-    BT_CONNECT(filterModel, &BtBookshelfFilterModel::layoutChanged,
-               slotModelChanged);
-    BT_CONNECT(filterModel, &BtBookshelfFilterModel::modelReset,
-               slotModelChanged);
-    BT_CONNECT(filterModel, &BtBookshelfFilterModel::rowsInserted,
-               slotModelChanged);
-    BT_CONNECT(filterModel, &BtBookshelfFilterModel::rowsRemoved,
-               std::move(slotModelChanged));
+    BT_CONNECT(m_menu, SIGNAL(triggered(CSwordModuleInfo *)),
+               this,   SIGNAL(triggered(CSwordModuleInfo *)));
+    BT_CONNECT(filterModel, SIGNAL(layoutChanged()),
+               this,        SLOT(slotModelChanged()));
+    BT_CONNECT(filterModel, SIGNAL(modelReset()),
+               this,        SLOT(slotModelChanged()));
+    BT_CONNECT(filterModel, SIGNAL(rowsInserted(QModelIndex, int, int)),
+               this,        SLOT(slotModelChanged()));
+    BT_CONNECT(filterModel, SIGNAL(rowsRemoved(QModelIndex, int, int)),
+               this,        SLOT(slotModelChanged()));
 }
 
 BtOpenWorkAction::~BtOpenWorkAction() {
@@ -115,4 +112,8 @@ BtOpenWorkAction::~BtOpenWorkAction() {
 
 void BtOpenWorkAction::retranslateUi() {
     setText(tr("&Open work"));
+}
+
+void BtOpenWorkAction::slotModelChanged() {
+    setEnabled(m_menu->postFilterModel()->rowCount() > 0);
 }

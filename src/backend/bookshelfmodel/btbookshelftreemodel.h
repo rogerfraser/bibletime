@@ -2,23 +2,22 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTBOOKSHELFTREEMODEL_H
+#define BTBOOKSHELFTREEMODEL_H
 
 #include <QAbstractItemModel>
 
-#include <memory>
 #include <QList>
 #include <QMap>
 #include <QPersistentModelIndex>
-#include "../config/btconfigcore.h"
 #include "../drivers/btconstmoduleset.h"
 #include "../drivers/btmoduleset.h"
 #include "btbookshelfmodel.h"
@@ -66,36 +65,34 @@ public: /* Types: */
             /**
               \warning Be careful using this constructor!
             */
-            explicit Grouping(bool empty = false) {
+            explicit inline Grouping(bool empty = false) {
                 if (empty)
                     return;
                 push_back(GROUP_CATEGORY);
                 push_back(GROUP_LANGUAGE);
             }
 
-            explicit Grouping(Group group) { push_back(group); }
+            explicit inline Grouping(Group group) { push_back(group); }
 
-            Grouping(BtConfigCore const & config, QString const & key) {
-                if (loadFrom(config, key))
+            explicit inline Grouping(const QString & configKey) {
+                if (loadFrom(configKey))
                     return;
                 push_back(GROUP_CATEGORY);
                 push_back(GROUP_LANGUAGE);
             }
 
-            Grouping(Grouping const & copy) = default;
-            Grouping & operator=(Grouping const & copy) = default;
+            inline Grouping(Grouping const & copy) = default;
+            inline Grouping & operator=(Grouping const & copy) = default;
 
-            bool loadFrom(BtConfigCore const & config, QString const & key);
-            void saveTo(BtConfigCore & config, QString const & key) const;
+            bool loadFrom(const QString & configKey);
+            void saveTo(const QString & configKey) const;
 
     };
 
 public: /* Methods: */
 
     BtBookshelfTreeModel(QObject * parent = nullptr);
-    BtBookshelfTreeModel(BtConfigCore const & config,
-                         QString const & configKey,
-                         QObject * parent = nullptr);
+    BtBookshelfTreeModel(const QString & configKey, QObject * parent = nullptr);
     BtBookshelfTreeModel(const Grouping & grouping, QObject * parent = nullptr);
     ~BtBookshelfTreeModel() override;
 
@@ -118,32 +115,32 @@ public: /* Methods: */
                  const QVariant & value,
                  int role) override;
 
-    CSwordModuleInfo * module(QModelIndex const & index) const {
+    inline CSwordModuleInfo * module(QModelIndex const & index) const {
         return static_cast<CSwordModuleInfo *>(
                 data(index,
                      BtBookshelfModel::ModulePointerRole).value<void *>());
     }
-    std::shared_ptr<QAbstractItemModel> sourceModel() const noexcept
-    { return m_sourceModel; }
-
-    Grouping const & groupingOrder() const { return m_groupingOrder; }
-    bool checkable() const { return m_checkable; }
-    CheckedBehavior defaultChecked() const { return m_defaultChecked; }
-    QList<CSwordModuleInfo *> modules() const { return m_modules.keys(); }
-    BtModuleSet const & checkedModules() const {
+    inline QAbstractItemModel * sourceModel() const { return m_sourceModel; }
+    inline const Grouping & groupingOrder() const { return m_groupingOrder; }
+    inline bool checkable() const { return m_checkable; }
+    inline CheckedBehavior defaultChecked() const { return m_defaultChecked; }
+    inline QList<CSwordModuleInfo *> modules() const { return m_modules.keys(); }
+    inline BtModuleSet const & checkedModules() const {
         return m_checkedModulesCache;
     }
 
-public Q_SLOTS:
+public slots:
 
-    void setSourceModel(std::shared_ptr<QAbstractItemModel> sourceModel);
+    void setSourceModel(QAbstractItemModel * sourceModel);
     void setGroupingOrder(const BtBookshelfTreeModel::Grouping & groupingOrder,
                           bool emitSignal = true);
     void setCheckable(bool checkable);
-    void setDefaultChecked(CheckedBehavior b) { m_defaultChecked = b; }
+    inline void setDefaultChecked(CheckedBehavior b) {
+        m_defaultChecked = b;
+    }
     void setCheckedModules(BtConstModuleSet const & modules);
 
-Q_SIGNALS:
+signals:
 
     void groupingOrderChanged(BtBookshelfTreeModel::Grouping newGrouping);
     void moduleChecked(CSwordModuleInfo * module, bool checked);
@@ -152,7 +149,7 @@ protected: /* Methods: */
 
     void resetData();
 
-protected Q_SLOTS:
+protected slots:
 
     void moduleDataChanged(const QModelIndex & topLeft,
                            const QModelIndex & bottomRight);
@@ -182,7 +179,7 @@ private: /* Methods: */
 
         if (!groupItem) {
             groupItem = new T(module);
-            groupIndex = parentItem.indexFor(*groupItem);
+            groupIndex = parentItem.indexFor(groupItem);
             beginInsertRows(parentIndex, groupIndex, groupIndex);
             parentItem.insertChild(groupIndex, groupItem);
             endInsertRows();
@@ -192,8 +189,8 @@ private: /* Methods: */
 
 private: /* Fields: */
 
-    std::shared_ptr<QAbstractItemModel> m_sourceModel;
-    std::unique_ptr<BookshelfModel::Item> m_rootItem;
+    QAbstractItemModel * m_sourceModel;
+    BookshelfModel::Item * m_rootItem;
     ModuleItemMap m_modules;
     SourceIndexMap m_sourceIndexMap;
     Grouping m_groupingOrder;
@@ -208,3 +205,5 @@ QDataStream & operator <<(QDataStream & os, const BtBookshelfTreeModel::Grouping
 QDataStream & operator >>(QDataStream & is, BtBookshelfTreeModel::Grouping & o);
 
 Q_DECLARE_METATYPE(BtBookshelfTreeModel::Grouping)
+
+#endif // BTBOOKSHELFTREEMODEL_H

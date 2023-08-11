@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -26,9 +26,8 @@
 #include "../../util/cresmgr.h"
 
 namespace {
-const QString CHTMLWriteDisplayGroup = "HtmlWriteDisplay";
-const QString CHTMLWriteDisplayFontKey = "font";
-const QString CHTMLWriteDisplayFontColorKey = "fontColor";
+const QString CHTMLWriteDisplayFontKey = "HtmlWriteDisplay/font";
+const QString CHTMLWriteDisplayFontColorKey = "HtmlWriteDisplay/fontColor";
 }
 
 
@@ -37,10 +36,10 @@ BtEditTextPage::BtEditTextPage(QWidget * parent)
     , m_plainTextEdit(new QTextEdit(this))
     , m_htmlTextEdit(new QTextEdit(this))
     , m_toolBar(new QToolBar(this))
-    , m_wizard(qobject_cast<BtEditTextWizard *>(parent))
-    , m_handingFormatChangeFromEditor(false)
-    , m_htmlMode(m_wizard->htmlMode())
-{
+    , m_wizard(nullptr)
+    , m_handingFormatChangeFromEditor(false) {
+
+    m_wizard = qobject_cast<BtEditTextWizard *>(parent);
     QVBoxLayout * verticalLayout = new QVBoxLayout(this);
     verticalLayout->addWidget(m_toolBar);
     verticalLayout->addWidget(m_plainTextEdit);
@@ -55,27 +54,9 @@ BtEditTextPage::BtEditTextPage(QWidget * parent)
     m_plainTextEdit->setAutoFormatting(QTextEdit::AutoNone);
     m_htmlTextEdit->setAutoFormatting(QTextEdit::AutoAll);
 
-    BT_CONNECT(m_htmlTextEdit, &QTextEdit::currentCharFormatChanged,
-               [this](QTextCharFormat const &) {
-                   BT_ASSERT(!m_handingFormatChangeFromEditor);
-                   m_handingFormatChangeFromEditor = true;
-                   QFont f = m_htmlTextEdit->currentFont();
-                   Q_EMIT signalFontChanged(f);
-                   Q_EMIT signalFontSizeChanged(f.pointSize());
-                   Q_EMIT signalFontColorChanged(m_htmlTextEdit->textColor());
-
-                   m_actions.bold->setChecked(f.bold());
-                   m_actions.italic->setChecked(f.italic());
-                   m_actions.underline->setChecked(f.underline());
-                   m_handingFormatChangeFromEditor = false;
-
-                   auto conf = btConfig().session().group(
-                                   CHTMLWriteDisplayGroup);
-                   conf.setValue(CHTMLWriteDisplayFontKey,
-                                 m_htmlTextEdit->currentFont());
-                   conf.setValue(CHTMLWriteDisplayFontColorKey,
-                                 m_htmlTextEdit->textColor());
-               });
+    BT_CONNECT(m_htmlTextEdit, SIGNAL(currentCharFormatChanged(QTextCharFormat)),
+               this, SLOT(slotCurrentCharFormatChanged(QTextCharFormat)),
+               Qt::DirectConnection);
 
     retranslateUi();
 }
@@ -139,9 +120,9 @@ void BtEditTextPage::retranslateUi() {
 }
 
 QFont BtEditTextPage::initHtmlFont() {
-    auto const conf = btConfig().session().group(CHTMLWriteDisplayGroup);
-    m_htmlTextEdit->setTextColor(conf.value(CHTMLWriteDisplayFontColorKey, m_htmlTextEdit->textColor()));
-    QFont f = conf.value(CHTMLWriteDisplayFontKey, m_htmlTextEdit->currentFont());
+    BtConfig & conf = btConfig();
+    m_htmlTextEdit->setTextColor(conf.sessionValue(CHTMLWriteDisplayFontColorKey, m_htmlTextEdit->textColor()));
+    QFont f = conf.sessionValue(CHTMLWriteDisplayFontKey, m_htmlTextEdit->currentFont());
     m_htmlTextEdit->setCurrentFont(f);
     return f;
 }
@@ -158,12 +139,9 @@ void BtEditTextPage::initActions() {
     m_actions.bold->setChecked(f.bold());
     m_actions.bold->setShortcut(CResMgr::displaywindows::writeWindow::boldText::accel);
     m_actions.bold->setToolTip( tr("Bold") );
-    BT_CONNECT(m_actions.bold, &QAction::toggled,
-               [this](bool const checked) {
-                   if (!m_handingFormatChangeFromEditor)
-                       m_htmlTextEdit->setFontWeight(
-                                   checked ? QFont::Bold : QFont::Normal);
-               });
+    BT_CONNECT(m_actions.bold, SIGNAL(toggled(bool)),
+               this,           SLOT(toggleBold(bool)),
+               Qt::DirectConnection);
 
     //--------------------italic toggle-------------------------
     m_actions.italic = new QAction(
@@ -173,11 +151,9 @@ void BtEditTextPage::initActions() {
     m_actions.italic->setCheckable(true);
     m_actions.italic->setChecked(f.italic());
     m_actions.bold->setShortcut(CResMgr::displaywindows::writeWindow::italicText::accel);
-    BT_CONNECT(m_actions.italic, &QAction::toggled,
-               [this](bool const checked) {
-                   if (!m_handingFormatChangeFromEditor)
-                       m_htmlTextEdit->setFontItalic(checked);
-               });
+    BT_CONNECT(m_actions.italic, SIGNAL(toggled(bool)),
+               this,             SLOT(toggleItalic(bool)),
+               Qt::DirectConnection);
     m_actions.italic->setToolTip( tr("Italic") );
 
     //--------------------underline toggle-------------------------
@@ -188,11 +164,9 @@ void BtEditTextPage::initActions() {
     m_actions.underline->setCheckable(true);
     m_actions.underline->setChecked(f.underline());
     m_actions.underline->setShortcut(CResMgr::displaywindows::writeWindow::underlinedText::accel);
-    BT_CONNECT(m_actions.underline, &QAction::toggled,
-               [this](bool const checked) {
-                   if (!m_handingFormatChangeFromEditor)
-                       m_htmlTextEdit->setFontUnderline(checked);
-               });
+    BT_CONNECT(m_actions.underline, SIGNAL(toggled(bool)),
+               this,                SLOT(toggleUnderline(bool)),
+               Qt::DirectConnection);
     m_actions.underline->setToolTip( tr("Underline") );
 
     //--------------------align left toggle-------------------------
@@ -201,16 +175,9 @@ void BtEditTextPage::initActions() {
                 tr("Left"), this);
     m_actions.alignLeft->setCheckable(true);
     m_actions.alignLeft->setShortcut(CResMgr::displaywindows::writeWindow::alignLeft::accel);
-    BT_CONNECT(m_actions.alignLeft, &QAction::toggled,
-               [this](bool const set) {
-                   if (!m_handingFormatChangeFromEditor
-                       && set
-                       && (m_htmlTextEdit->alignment() != Qt::AlignLeft))
-                   {
-                       m_htmlTextEdit->setAlignment(Qt::AlignLeft);
-                       alignmentChanged(Qt::AlignLeft);
-                   }
-               });
+    BT_CONNECT(m_actions.alignLeft, SIGNAL(toggled(bool)),
+               this,                SLOT(alignLeft(bool)),
+               Qt::DirectConnection);
     m_actions.alignLeft->setToolTip( tr("Align left") );
 
     //--------------------align center toggle-------------------------
@@ -219,16 +186,9 @@ void BtEditTextPage::initActions() {
                 tr("Center"), this);
     m_actions.alignCenter->setCheckable(true);
     m_actions.alignCenter->setShortcut(CResMgr::displaywindows::writeWindow::alignCenter::accel);
-    BT_CONNECT(m_actions.alignCenter, &QAction::toggled,
-               [this](bool const set) {
-                   if (!m_handingFormatChangeFromEditor
-                       && set
-                       && (m_htmlTextEdit->alignment() != Qt::AlignHCenter))
-                   {
-                       m_htmlTextEdit->setAlignment(Qt::AlignHCenter);
-                       alignmentChanged(Qt::AlignHCenter);
-                   }
-               });
+    BT_CONNECT(m_actions.alignCenter, SIGNAL(toggled(bool)),
+               this,                  SLOT(alignCenter(bool)),
+               Qt::DirectConnection);
     m_actions.alignCenter->setToolTip( tr("Center") );
 
     //--------------------align right toggle-------------------------
@@ -237,17 +197,47 @@ void BtEditTextPage::initActions() {
                 tr("Right"), this);
     m_actions.alignRight->setCheckable(true);
     m_actions.alignRight->setShortcut(CResMgr::displaywindows::writeWindow::alignRight::accel);
-    BT_CONNECT(m_actions.alignRight, &QAction::toggled,
-               [this](bool const set) {
-                   if (!m_handingFormatChangeFromEditor
-                       && set
-                       && (m_htmlTextEdit->alignment() != Qt::AlignRight))
-                   {
-                       m_htmlTextEdit->setAlignment(Qt::AlignRight);
-                       alignmentChanged(Qt::AlignRight);
-                   }
-               });
+    BT_CONNECT(m_actions.alignRight, SIGNAL(toggled(bool)),
+               this,                 SLOT(alignRight(bool)),
+               Qt::DirectConnection);
     m_actions.alignRight->setToolTip( tr("Align right") );
+
+}
+
+void BtEditTextPage::toggleBold(bool checked) {
+    if (!m_handingFormatChangeFromEditor)
+        m_htmlTextEdit->setFontWeight(checked ? QFont::Bold : QFont::Normal);
+}
+
+void BtEditTextPage::toggleItalic(bool checked) {
+    if (!m_handingFormatChangeFromEditor)
+        m_htmlTextEdit->setFontItalic(checked);
+}
+
+void BtEditTextPage::toggleUnderline(bool checked) {
+    if (!m_handingFormatChangeFromEditor)
+        m_htmlTextEdit->setFontUnderline(checked);
+}
+
+void BtEditTextPage::alignLeft(bool set) {
+    if (!m_handingFormatChangeFromEditor && set && (m_htmlTextEdit->alignment() != Qt::AlignLeft)) {
+        m_htmlTextEdit->setAlignment(Qt::AlignLeft);
+        alignmentChanged(Qt::AlignLeft);
+    }
+}
+
+void BtEditTextPage::alignCenter(bool set) {
+    if (!m_handingFormatChangeFromEditor && set && (m_htmlTextEdit->alignment() != Qt::AlignHCenter)) {
+        m_htmlTextEdit->setAlignment(Qt::AlignHCenter);
+        alignmentChanged(Qt::AlignHCenter);
+    }
+}
+
+void BtEditTextPage::alignRight(bool set) {
+    if (!m_handingFormatChangeFromEditor && set && (m_htmlTextEdit->alignment() != Qt::AlignRight)) {
+        m_htmlTextEdit->setAlignment(Qt::AlignRight);
+        alignmentChanged(Qt::AlignRight);
+    }
 }
 
 /** The text's alignment changed. Enable the right buttons. */
@@ -286,13 +276,11 @@ void BtEditTextPage::setupToolBar() {
     fontFamilyCombo->setCurrentFont(f);
     fontFamilyCombo->setToolTip( tr("Font") );
     m_toolBar->addWidget(fontFamilyCombo);
-    BT_CONNECT(fontFamilyCombo, &QFontComboBox::currentFontChanged,
-               [this](QFont const & font) {
-                   if (!m_handingFormatChangeFromEditor)
-                       m_htmlTextEdit->setFontFamily(font.family());
-               });
-    BT_CONNECT(this,            &BtEditTextPage::signalFontChanged,
-               fontFamilyCombo, &QFontComboBox::setCurrentFont,
+    BT_CONNECT(fontFamilyCombo, SIGNAL(currentFontChanged(QFont const &)),
+               this,            SLOT(slotFontFamilyChosen(QFont const &)),
+               Qt::DirectConnection);
+    BT_CONNECT(this,            SIGNAL(signalFontChanged(QFont const &)),
+               fontFamilyCombo, SLOT(setCurrentFont(QFont const &)),
                Qt::DirectConnection);
 
     //--------------------font size chooser-------------------------
@@ -300,27 +288,22 @@ void BtEditTextPage::setupToolBar() {
     fontSizeChooser->setFontSize(f.pointSize());
     fontSizeChooser->setToolTip( tr("Font size") );
     m_toolBar->addWidget(fontSizeChooser);
-    BT_CONNECT(fontSizeChooser, &BtFontSizeWidget::fontSizeChanged,
-               [this](int const newSize) {
-                   if (!m_handingFormatChangeFromEditor)
-                       m_htmlTextEdit->setFontPointSize(
-                                   static_cast<qreal>(newSize));
-               });
-    BT_CONNECT(this,            &BtEditTextPage::signalFontSizeChanged,
-               fontSizeChooser, &BtFontSizeWidget::setFontSize,
+    BT_CONNECT(fontSizeChooser, SIGNAL(fontSizeChanged(int)),
+               this,            SLOT(slotFontSizeChosen(int)),
                Qt::DirectConnection);
+    BT_CONNECT(this,            SIGNAL(signalFontSizeChanged(int)),
+               fontSizeChooser, SLOT(setFontSize(int)), Qt::DirectConnection);
 
     //--------------------color button-------------------------
     BtColorWidget* fontColorChooser = new BtColorWidget();
     fontColorChooser->setColor(m_htmlTextEdit->textColor());
     fontColorChooser->setToolTip(tr("Font color"));
     m_toolBar->addWidget(fontColorChooser);
-    BT_CONNECT(fontColorChooser, &BtColorWidget::changed,
-               m_htmlTextEdit,   &QTextEdit::setTextColor,
+    BT_CONNECT(fontColorChooser, SIGNAL(changed(QColor const &)),
+               m_htmlTextEdit,       SLOT(setTextColor(QColor const &)),
                Qt::DirectConnection);
-    BT_CONNECT(this,             &BtEditTextPage::signalFontColorChanged,
-               fontColorChooser, &BtColorWidget::setColor,
-               Qt::DirectConnection);
+    BT_CONNECT(this,             SIGNAL(signalFontColorChanged(QColor const &)),
+               fontColorChooser, SLOT(setColor(QColor)), Qt::DirectConnection);
 
     m_toolBar->addSeparator();
 
@@ -334,4 +317,32 @@ void BtEditTextPage::setupToolBar() {
     m_toolBar->addAction(m_actions.alignLeft);
     m_toolBar->addAction(m_actions.alignCenter);
     m_toolBar->addAction(m_actions.alignRight);
+}
+
+void BtEditTextPage::slotCurrentCharFormatChanged(const QTextCharFormat &) {
+    BT_ASSERT(!m_handingFormatChangeFromEditor);
+    m_handingFormatChangeFromEditor = true;
+    QFont f = m_htmlTextEdit->currentFont();
+    emit signalFontChanged(f);
+    emit signalFontSizeChanged(f.pointSize());
+    emit signalFontColorChanged(m_htmlTextEdit->textColor());
+
+    m_actions.bold->setChecked(f.bold());
+    m_actions.italic->setChecked(f.italic());
+    m_actions.underline->setChecked(f.underline());
+    m_handingFormatChangeFromEditor = false;
+
+    BtConfig & conf = btConfig();
+    conf.setSessionValue(CHTMLWriteDisplayFontKey, m_htmlTextEdit->currentFont());
+    conf.setSessionValue(CHTMLWriteDisplayFontColorKey, m_htmlTextEdit->textColor());
+}
+
+void BtEditTextPage::slotFontSizeChosen(int newSize) {
+    if (!m_handingFormatChangeFromEditor)
+        m_htmlTextEdit->setFontPointSize(static_cast<qreal>(newSize));
+}
+
+void BtEditTextPage::slotFontFamilyChosen(const QFont& font) {
+    if (!m_handingFormatChangeFromEditor)
+        m_htmlTextEdit->setFontFamily(font.family());
 }

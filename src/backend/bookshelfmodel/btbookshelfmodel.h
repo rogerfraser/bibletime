@@ -2,19 +2,19 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTBOOKSHELFMODEL_H
+#define BTBOOKSHELFMODEL_H
 
 #include <QAbstractListModel>
 
-#include <memory>
 #include "../drivers/btconstmoduleset.h"
 #include "../drivers/btmoduleset.h"
 #include "../drivers/cswordmoduleinfo.h"
@@ -46,24 +46,10 @@ public: /* Types: */
         UserRole
     };
 
-private: /* Types: */
-
-    /// Used to restrict construction to newInstance() only.
-    struct ConstructInPrivate {};
-
 public: /* Methods: */
 
-    BtBookshelfModel(BtBookshelfModel &&) = delete;
-    BtBookshelfModel(BtBookshelfModel const &) = delete;
-    BtBookshelfModel(ConstructInPrivate const &);
-
-    static std::shared_ptr<BtBookshelfModel> newInstance();
-
-    ~BtBookshelfModel() noexcept;
-
-    BtBookshelfModel & operator=(BtBookshelfModel &&) = delete;
-    BtBookshelfModel & operator=(BtBookshelfModel const &) = delete;
-
+    inline BtBookshelfModel(QObject * const parent = nullptr)
+        : QAbstractListModel(parent) {}
 
     // Virtual methods implemented from QAbstractListModel:
     int rowCount(const QModelIndex & parent = QModelIndex()) const override;
@@ -81,7 +67,7 @@ public: /* Methods: */
       CSwordModuleInfo instance corresponding to the given index.
       \param[in] index An index to this model.
     */
-    CSwordModuleInfo * module(QModelIndex const & index) const {
+    inline CSwordModuleInfo * module(const QModelIndex & index) const {
         return static_cast<CSwordModuleInfo *>(
                data(index,
                     BtBookshelfModel::ModulePointerRole).value<void *>());
@@ -99,6 +85,12 @@ public: /* Methods: */
       \param[in] module Module to add.
     */
     void addModule(CSwordModuleInfo * const module);
+
+    /**
+      Appends the all the modules in the given set to this model.
+      \param[in] modules Set of modules to add.
+    */
+    void addModules(BtModuleSet const & modules);
 
     /**
       Removes the given module from this model and optionally destroys it.
@@ -135,9 +127,11 @@ public: /* Methods: */
     /**
       Returns the list of handled modules as a list of CSwordModuleInfo* pointers.
     */
-    QList<CSwordModuleInfo *> const & moduleList() const { return m_data; }
+    inline const QList<CSwordModuleInfo *> & moduleList() const {
+        return m_data;
+    }
 
-protected Q_SLOTS:
+protected slots:
 
     /**
       Slot DIRECTLY called by CSwordModuleInfo when the hidden status of the respective
@@ -180,3 +174,5 @@ private: /* Fields: */
     QList<CSwordModuleInfo *> m_data;
 
 };
+
+#endif // BTBOOKSHELFMODEL_H

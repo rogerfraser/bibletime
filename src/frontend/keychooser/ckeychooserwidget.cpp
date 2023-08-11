@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -59,7 +59,7 @@ bool CKCComboBox::eventFilter(QObject * o, QEvent * e) {
             if (index == -1)
                 index = 0; // return 0 if not found
             setCurrentIndex(index);
-            Q_EMIT focusOut(index);
+            emit focusOut(index);
             return false;
         }
 
@@ -68,27 +68,27 @@ bool CKCComboBox::eventFilter(QObject * o, QEvent * e) {
 
         if (f->reason() == Qt::ActiveWindowFocusReason) {
 #if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
-            Q_EMIT activated(currentText());
+            emit activated(currentText());
 #else
-            Q_EMIT textActivated(currentText());
+            emit textActivated(currentText());
 #endif
             return false;
         }
 
         if (f->reason() == Qt::MouseFocusReason) {
 #if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
-            Q_EMIT activated(currentText());
+            emit activated(currentText());
 #else
-            Q_EMIT textActivated(currentText());
+            emit textActivated(currentText());
 #endif
             return false;
         }
 
         if (o == this) {
 #if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
-            Q_EMIT activated(currentText());
+            emit activated(currentText());
 #else
-            Q_EMIT textActivated(currentText());
+            emit textActivated(currentText());
 #endif
             return false;
         }
@@ -167,7 +167,7 @@ void CKeyChooserWidget::reset(const QStringList * list, int index, bool do_emit)
     }
 
     if (do_emit)
-        Q_EMIT changed(m_comboBox->currentIndex());
+        emit changed(m_comboBox->currentIndex());
 
     m_comboBox->sizeHint(); //without this function call the combo box won't be properly sized!
     //DON'T REMOVE OR MOVE THE show()! Otherwise QComboBox's sizeHint() function won't work properly!
@@ -206,76 +206,46 @@ void CKeyChooserWidget::init() {
     setTabOrder(m_comboBox, nullptr);
     setFocusProxy(m_comboBox);
 
-    BT_CONNECT(m_scroller, &CScrollerWidgetSet::scroller_pressed,
-               [this]{
-                   updatelock = true;
-                   m_comboBox->setEditable(false);
-                   m_oldKey = m_comboBox->currentText();
-               });
-    BT_CONNECT(m_scroller, &CScrollerWidgetSet::scroller_released,
-               [this]{
-                   updatelock = false;
-                   m_comboBox->setEditable(true);
-                   m_comboBox->setEditText(
-                               m_comboBox->itemText(
-                                   m_comboBox->currentIndex()));
-                   if (m_comboBox->currentText() != m_oldKey)
-                       Q_EMIT changed(m_comboBox->currentIndex());
-               });
-    BT_CONNECT(m_scroller, &CScrollerWidgetSet::change,
-               [this](int n) {
-                   const int old_index = m_comboBox->currentIndex();
-                   int new_index = old_index + n;
-
-                   //index of highest Item
-                   const int max = m_comboBox->count() - 1;
-                   if (new_index > max)
-                       new_index = max;
-                   if (new_index < 0)
-                       new_index = 0;
-
-                   if (new_index != old_index) {
-                       m_comboBox->setCurrentIndex(new_index);
-                       if (!updatelock)
-                           Q_EMIT changed(new_index);
-                   }
-               });
-    BT_CONNECT(m_comboBox,
-               static_cast<void (QComboBox::*)(int)>(&QComboBox::activated),
-               [this](int index) {
-                   if (!updatesEnabled())
-                       return;
-
-                   setUpdatesEnabled(false);
-
-                   const QString key(m_comboBox->itemText(index));
-                   if (m_oldKey.isNull() || (m_oldKey != key))
-                       Q_EMIT changed(index);
-
-                   m_oldKey = key;
-
-                   setUpdatesEnabled(true);
-               });
-    BT_CONNECT(m_comboBox->lineEdit(), &QLineEdit::returnPressed,
-               [this]{
-                   BT_ASSERT(m_comboBox->lineEdit());
-
-                   const QString text(m_comboBox->lineEdit()->text());
-                   for (int index = 0; index < m_comboBox->count(); ++index) {
-                       if (m_comboBox->itemText(index) == text) {
-               //            emit changed(index);
-                           /* a workaround because focusOut is not checked, the
-                              slot connected to changed to check: */
-                           Q_EMIT focusOut(index);
-                           break;
-                       }
-                   }
-               });
-    BT_CONNECT(m_comboBox, &CKCComboBox::focusOut,
-               this, &CKeyChooserWidget::focusOut);
+    BT_CONNECT(m_scroller, SIGNAL(scroller_pressed()),  SLOT(lock()));
+    BT_CONNECT(m_scroller, SIGNAL(scroller_released()), SLOT(unlock()));
+    BT_CONNECT(m_scroller, SIGNAL(change(int)),         SLOT(changeCombo(int)));
+    BT_CONNECT(m_comboBox, SIGNAL(activated(int)), SLOT(slotComboChanged(int)));
+    BT_CONNECT(m_comboBox->lineEdit(), SIGNAL(returnPressed()),
+               SLOT(slotReturnPressed()));
+    BT_CONNECT(m_comboBox, SIGNAL(focusOut(int)), SIGNAL(focusOut(int)));
 
     updatelock = false;
     m_isResetting = false;
+}
+
+/** Is called when the return key was presed in the combobox. */
+void CKeyChooserWidget::slotReturnPressed() {
+    BT_ASSERT(m_comboBox->lineEdit());
+
+    const QString text(m_comboBox->lineEdit()->text());
+    for (int index = 0; index < m_comboBox->count(); ++index) {
+        if (m_comboBox->itemText(index) == text) {
+//            emit changed(index);
+            emit focusOut(index); // a workaround because focusOut is not checked, the slot connected to changed to check
+            break;
+        }
+    }
+}
+
+/** Is called when the current item of the combo box was changed. */
+void CKeyChooserWidget::slotComboChanged(int index) {
+    if (!updatesEnabled())
+        return;
+
+    setUpdatesEnabled(false);
+
+    const QString key(m_comboBox->itemText(index));
+    if (m_oldKey.isNull() || (m_oldKey != key))
+        emit changed(index);
+
+    m_oldKey = key;
+
+    setUpdatesEnabled(true);
 }
 
 /** Sets the tooltips for the given entries using the parameters as text. */
@@ -303,3 +273,37 @@ bool CKeyChooserWidget::setItem(const QString & item) {
         m_comboBox->setCurrentIndex(-1);
     return ret;
 }
+
+/* Handlers for the various scroller widgetset. */
+void CKeyChooserWidget::lock() {
+    updatelock = true;
+    m_comboBox->setEditable(false);
+    m_oldKey = m_comboBox->currentText();
+}
+
+void CKeyChooserWidget::unlock() {
+    updatelock = false;
+    m_comboBox->setEditable(true);
+    m_comboBox->setEditText(m_comboBox->itemText(m_comboBox->currentIndex()));
+    if (m_comboBox->currentText() != m_oldKey)
+        emit changed(m_comboBox->currentIndex());
+}
+
+void CKeyChooserWidget::changeCombo(int n) {
+    const int old_index = m_comboBox->currentIndex();
+    int new_index = old_index + n;
+
+    //index of highest Item
+    const int max = m_comboBox->count() - 1;
+    if (new_index > max)
+        new_index = max;
+    if (new_index < 0)
+        new_index = 0;
+
+    if (new_index != old_index) {
+        m_comboBox->setCurrentIndex(new_index);
+        if (!updatelock)
+            emit changed(new_index);
+    }
+}
+

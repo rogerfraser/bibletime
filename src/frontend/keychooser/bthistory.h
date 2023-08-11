@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTHISTORY_H
+#define BTHISTORY_H
 
 #include <QObject>
 
@@ -36,7 +37,7 @@ class BTHistory: public QObject {
         */
         QList<QAction*> getFwList();
 
-    public Q_SLOTS:
+    public slots:
         /**
         * Add a new key to the history.
         */
@@ -54,7 +55,7 @@ class BTHistory: public QObject {
         */
         void fw();
 
-    Q_SIGNALS:
+    signals:
         /**
         * Signal will be sent when the history has been changed (added, moved)
         */
@@ -73,3 +74,5 @@ class BTHistory: public QObject {
         int m_index; //pointer to the current item; -1==empty, 0==first etc.
         bool m_inHistoryFunction; //to prevent recursive behaviour
 };
+
+#endif

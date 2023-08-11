@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -18,7 +18,6 @@
 #include <QSet>
 #include <QString>
 #include <QTextCodec>
-#include "../../util/btconnect.h"
 #include "../../util/directory.h"
 #include "../btglobal.h"
 #include "../btinstallmgr.h"
@@ -27,20 +26,14 @@
 #include "../drivers/cswordbookmoduleinfo.h"
 #include "../drivers/cswordcommentarymoduleinfo.h"
 #include "../drivers/cswordlexiconmoduleinfo.h"
-#include "btlocalemgr.h"
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <encfiltmgr.h>
 #include <filemgr.h>
 #include <rtfhtml.h>
 #include <swfiltermgr.h>
 #include <swfilter.h>
-#include <swversion.h>
 #include <utilstr.h>
-#pragma GCC diagnostic pop
 
 
 using namespace Rendering;
@@ -48,79 +41,44 @@ using namespace Rendering;
 CSwordBackend * CSwordBackend::m_instance = nullptr;
 
 CSwordBackend::CSwordBackend()
-        : m_manager(nullptr, nullptr, false,
-                    new sword::EncodingFilterMgr(sword::ENC_UTF8), true)
-        , m_dataModel(BtBookshelfModel::newInstance())
-{
-    auto const clearCache =
-            [this]() noexcept {
-                std::atomic_store_explicit(
-                            &m_availableLanguagesCache,
-                            decltype(m_availableLanguagesCache)(),
-                            std::memory_order_relaxed);
-            };
-    BT_CONNECT(m_dataModel.get(), &BtBookshelfModel::rowsAboutToBeInserted,
-               clearCache);
-    BT_CONNECT(m_dataModel.get(), &BtBookshelfModel::rowsAboutToBeRemoved,
-               clearCache);
-}
+        : sword::SWMgr(nullptr, nullptr, false,
+                       new sword::EncodingFilterMgr(sword::ENC_UTF8), true)
+        , m_dataModel(this)
+{}
 
 CSwordBackend::CSwordBackend(const QString & path, const bool augmentHome)
-        : m_manager(!path.isEmpty() ? path.toLocal8Bit().constData() : nullptr,
-                    false, new sword::EncodingFilterMgr(sword::ENC_UTF8),
-                    false, augmentHome)
-        , m_dataModel(BtBookshelfModel::newInstance())
+        : sword::SWMgr(!path.isEmpty() ? path.toLocal8Bit().constData() : nullptr,
+                       false, new sword::EncodingFilterMgr(sword::ENC_UTF8),
+                       false, augmentHome)
 {}
 
 CSwordBackend::~CSwordBackend() {
     shutdownModules();
 }
 
+BtModuleList CSwordBackend::moduleList(CSwordModuleInfo::ModuleType type) const
+{
+    BtModuleList l;
+    Q_FOREACH(CSwordModuleInfo * m, moduleList())
+        if(m->type() == type)
+            l.append(m);
+    return l;
+}
+
 CSwordModuleInfo * CSwordBackend::findFirstAvailableModule(CSwordModuleInfo::ModuleType type) {
 
-    for (CSwordModuleInfo * const m : moduleList())
+    Q_FOREACH(CSwordModuleInfo * m, moduleList())
         if(m->type() == type)
             return m;
     return nullptr;
 
 }
 
-std::shared_ptr<CSwordBackend::AvailableLanguagesCacheContainer const>
-CSwordBackend::availableLanguages() noexcept
-{
-    auto oldCache = std::atomic_load_explicit(&m_availableLanguagesCache,
-                                              std::memory_order_acquire);
-    if (oldCache)
-        return oldCache;
-
-    auto const generateCache =
-            [&model = *m_dataModel] {
-                AvailableLanguagesCacheContainer newCache;
-                for (auto const * const mod : model.moduleList()) {
-                    newCache.emplace(mod->language());
-                    if (auto lang2 = mod->glossaryTargetlanguage())
-                        newCache.emplace(std::move(lang2));
-                }
-
-                return std::make_shared<AvailableLanguagesCacheContainer const>(
-                            std::move(newCache)); // also makes container const
-            };
-
-    for (auto newCache = generateCache();; newCache = generateCache())
-        if (std::atomic_compare_exchange_strong_explicit(
-                &m_availableLanguagesCache,
-                &oldCache,
-                newCache,
-                std::memory_order_acq_rel,
-                std::memory_order_relaxed))
-            return newCache;
-}
-
 void CSwordBackend::uninstallModules(BtConstModuleSet const & toBeDeleted) {
     if (toBeDeleted.empty())
         return;
-    m_dataModel->removeModules(toBeDeleted);
-    Q_EMIT sigSwordSetupChanged(RemovedModules);
+    m_dataModel.removeModules(toBeDeleted);
+    emit sigSwordSetupChanged(RemovedModules);
 
     BtInstallMgr installMgr;
     QMap<QString, sword::SWMgr *> mgrDict; // Maps config paths to SWMgr objects
@@ -161,7 +119,7 @@ void CSwordBackend::uninstallModules(BtConstModuleSet const & toBeDeleted) {
 
 QList<CSwordModuleInfo *> CSwordBackend::getPointerList(const QStringList & names) const {
     QList<CSwordModuleInfo *> list;
-    for (auto const & name : names)
+    Q_FOREACH (const QString & name, names)
         if (CSwordModuleInfo * const mInfo = findModuleByName(name))
             list.append(mInfo);
     return list;
@@ -169,7 +127,7 @@ QList<CSwordModuleInfo *> CSwordBackend::getPointerList(const QStringList & name
 
 BtConstModuleList CSwordBackend::getConstPointerList(const QStringList & names) const {
     BtConstModuleList list;
-    for (auto const & name : names)
+    Q_FOREACH (const QString & name, names)
         if (CSwordModuleInfo const * const mInfo = findModuleByName(name))
             list.append(mInfo);
     return list;
@@ -179,29 +137,28 @@ CSwordBackend::LoadError CSwordBackend::initModules(const SetupChangedReason rea
     // qWarning("globalSwordConfigPath is %s", globalConfPath);
 
     shutdownModules(); // Remove previous modules
-    m_dataModel->clear();
+    m_dataModel.clear();
 
-    const LoadError ret = static_cast<LoadError>(m_manager.load());
+    sword::ModMap::iterator end = Modules.end();
+    const LoadError ret = static_cast<LoadError>(load());
 
-    for (auto const & modulePair : m_manager.getModules()) {
-        sword::SWModule * const curMod = modulePair.second;
+    for (sword::ModMap::iterator it = Modules.begin(); it != end; ++it) {
+        sword::SWModule * const curMod = it->second;
         BT_ASSERT(curMod);
-        std::unique_ptr<CSwordModuleInfo> newModule;
+        CSwordModuleInfo * newModule;
 
         const char * const modType = curMod->getType();
         if (!strcmp(modType, "Biblical Texts")) {
-            newModule = std::make_unique<CSwordBibleModuleInfo>(*curMod, *this);
+            newModule = new CSwordBibleModuleInfo(*curMod, *this);
             newModule->setDisplay(&m_chapterDisplay);
         } else if (!strcmp(modType, "Commentaries")) {
-            newModule = std::make_unique<CSwordCommentaryModuleInfo>(*curMod,
-                                                                     *this);
+            newModule = new CSwordCommentaryModuleInfo(*curMod, *this);
             newModule->setDisplay(&m_entryDisplay);
         } else if (!strcmp(modType, "Lexicons / Dictionaries")) {
-            newModule = std::make_unique<CSwordLexiconModuleInfo>(*curMod,
-                                                                  *this);
+            newModule = new CSwordLexiconModuleInfo(*curMod, *this);
             newModule->setDisplay(&m_entryDisplay);
         } else if (!strcmp(modType, "Generic Books")) {
-            newModule = std::make_unique<CSwordBookModuleInfo>(*curMod, *this);
+            newModule = new CSwordBookModuleInfo(*curMod, *this);
             newModule->setDisplay(&m_bookDisplay);
         } else {
             continue;
@@ -219,29 +176,29 @@ CSwordBackend::LoadError CSwordBackend::initModules(const SetupChangedReason rea
              * Reading from the module can happen in subtle ways. The addModule below causes a read
              * to determine if the locked or unlocked icon is used by the model.
              */
-            if (newModule->isEncrypted()) {
-                auto const unlockKey(
-                        btConfig().getModuleEncryptionKey(newModule->name()));
-                if (!unlockKey.isNull())
-                    m_manager.setCipherKey(
-                                newModule->name().toUtf8().constData(),
-                                unlockKey.toUtf8().constData());
+            {
+                if (newModule->isEncrypted()) {
+                    const QString unlockKey = btConfig().getModuleEncryptionKey(newModule->name());
+                    if (!unlockKey.isNull())
+                        setCipherKey(newModule->name().toUtf8().constData(),
+                                     unlockKey.toUtf8().constData());
+                }
             }
 
-            /// \todo Refactor data model to use shared_ptr to contain works
-            m_dataModel->addModule(newModule.get());
-            newModule.release();
+                m_dataModel.addModule(newModule);
+        } else {
+            delete newModule;
         }
     }
 
-    Q_EMIT sigSwordSetupChanged(reason);
+    emit sigSwordSetupChanged(reason);
     return ret;
 }
 
-void CSwordBackend::Private::addRenderFilters(sword::SWModule * module,
-                                              sword::ConfigEntMap & section)
+void CSwordBackend::addRenderFilters(sword::SWModule * module,
+                                     sword::ConfigEntMap & section)
 {
-    auto entry(section.find("SourceType"));
+    sword::ConfigEntMap::const_iterator entry = section.find("SourceType");
     if (entry != section.end()) {
         if (entry->second == "OSIS") {
             module->addRenderFilter(&m_osisFilter);
@@ -268,11 +225,7 @@ void CSwordBackend::Private::addRenderFilters(sword::SWModule * module,
 }
 
 void CSwordBackend::shutdownModules() {
-    m_dataModel->clear(true);
-    m_manager.shutdownModules();
-}
-
-void CSwordBackend::Private::shutdownModules() {
+    m_dataModel.clear(true);
     //BT  mods are deleted now, delete Sword mods, too.
     deleteAllModules();
 
@@ -281,10 +234,11 @@ void CSwordBackend::Private::shutdownModules() {
      * modules. If these modules are removed, the filters need to be removed as well,
      * so that they are re-created for the new module objects.
      */
-    for (auto const & filterPair : cipherFilters) {
+    using FMCI = sword::FilterMap::const_iterator;
+    for (FMCI it = cipherFilters.begin(); it != cipherFilters.end(); ++it) {
         //Delete the Filter and remove it from the cleanup list
-        cleanupFilters.remove(filterPair.second);
-        delete filterPair.second;
+        cleanupFilters.remove(it->second);
+        delete it->second;
     }
     cipherFilters.clear();
 }
@@ -295,21 +249,21 @@ void CSwordBackend::setOption(const CSwordModuleInfo::FilterTypes type,
     if (type == CSwordModuleInfo::textualVariants) {
         switch (state) {
         case 0:
-            m_manager.setGlobalOption(optionName(type).toUtf8().constData(),
-                                      "Primary Reading");
+            setGlobalOption(optionName(type).toUtf8().constData(),
+                            "Primary Reading");
             break;
         case 1:
-            m_manager.setGlobalOption(optionName(type).toUtf8().constData(),
-                                      "Secondary Reading");
+            setGlobalOption(optionName(type).toUtf8().constData(),
+                            "Secondary Reading");
             break;
         default:
-            m_manager.setGlobalOption(optionName(type).toUtf8().constData(),
-                                      "All Readings");
+            setGlobalOption(optionName(type).toUtf8().constData(),
+                            "All Readings");
             break;
         }
     } else {
-        m_manager.setGlobalOption(optionName(type).toUtf8().constData(),
-                                  state ? "On" : "Off");
+        setGlobalOption(optionName(type).toUtf8().constData(),
+                        state ? "On" : "Off");
     }
 }
 
@@ -330,21 +284,21 @@ void CSwordBackend::setFilterOptions(const FilterOptions & options) {
 }
 
 CSwordModuleInfo * CSwordBackend::findModuleByDescription(const QString & description) const {
-    for (auto * const mod : m_dataModel->moduleList())
+    Q_FOREACH(CSwordModuleInfo * const mod, m_dataModel.moduleList())
         if (mod->config(CSwordModuleInfo::Description) == description)
             return mod;
     return nullptr;
 }
 
 CSwordModuleInfo * CSwordBackend::findModuleByName(const QString & name) const {
-    for (auto * const mod : m_dataModel->moduleList())
+    Q_FOREACH(CSwordModuleInfo * const mod, m_dataModel.moduleList())
         if (mod->name().compare(name, Qt::CaseInsensitive) == 0)
             return mod;
     return nullptr;
 }
 
 CSwordModuleInfo * CSwordBackend::findSwordModuleByPointer(const sword::SWModule * const swmodule) const {
-    for (auto * const mod : m_dataModel->moduleList())
+    Q_FOREACH(CSwordModuleInfo * const mod, m_dataModel.moduleList())
         if (&mod->module() == swmodule)
             return mod;
     return nullptr;
@@ -441,35 +395,32 @@ QString CSwordBackend::configOptionName(const CSwordModuleInfo::FilterTypes opti
     return QString();
 }
 
-QString CSwordBackend::booknameLanguage() const
-{ return BtLocaleMgr::defaultLocaleName(); }
+const QString CSwordBackend::booknameLanguage(const QString & language) {
+    if (!language.isEmpty()) {
+        sword::LocaleMgr::getSystemLocaleMgr()->setDefaultLocaleName(language.toUtf8().constData());
 
-void CSwordBackend::setBooknameLanguage(QString const & language) {
-    BtLocaleMgr::setDefaultLocaleName(language);
+        // Refresh the locale of all Bible and commentary modules!
+        // Use what sword returns, language may be different.
+        const QByteArray newLocaleName(QString(sword::LocaleMgr::getSystemLocaleMgr()->getDefaultLocaleName()).toUtf8());
 
-    // Refresh the locale of all Bible and commentary modules!
-    // Use what sword returns, language may be different.
-    const QByteArray newLocaleName(BtLocaleMgr::defaultLocaleName().toUtf8());
-
-    for (auto const * const mod : m_dataModel->moduleList()) {
-        if (mod->type() == CSwordModuleInfo::Bible
-            || mod->type() == CSwordModuleInfo::Commentary)
-        {
-            // Create a new key, it will get the default bookname language:
-            using VK = sword::VerseKey;
-            VK & vk = *static_cast<VK *>(mod->module().getKey());
-            vk.setLocale(newLocaleName.constData());
+        Q_FOREACH(CSwordModuleInfo const * const mod, m_dataModel.moduleList()) {
+            if (mod->type() == CSwordModuleInfo::Bible
+                || mod->type() == CSwordModuleInfo::Commentary)
+            {
+                // Create a new key, it will get the default bookname language:
+                using VK = sword::VerseKey;
+                VK & vk = *static_cast<VK *>(mod->module().getKey());
+                vk.setLocale(newLocaleName.constData());
+            }
         }
+
     }
+    return sword::LocaleMgr::getSystemLocaleMgr()->getDefaultLocaleName();
 }
 
 void CSwordBackend::reloadModules(const SetupChangedReason reason) {
     shutdownModules();
-    m_manager.reloadConfig();
-    initModules(reason);
-}
 
-void CSwordBackend::Private::reloadConfig() {
     //delete Sword's config to make Sword reload it!
 
     if (myconfig) { // force reload on config object because we may have changed the paths
@@ -482,6 +433,8 @@ void CSwordBackend::Private::reloadConfig() {
     } else if (config) {
         config->load();
     }
+
+    initModules(reason);
 }
 
 // Get one or more shared sword config (sword.conf) files
@@ -491,7 +444,7 @@ QStringList CSwordBackend::getSharedSwordConfigFiles() const {
     return QStringList(util::directory::convertDirSeparators(qgetenv("SWORD_PATH")) += "/Sword/sword.conf");
 #else
     // /etc/sword.conf, /usr/local/etc/sword.conf
-    return QString(m_manager.globalConfPath).split(":");
+    return QString(globalConfPath).split(":");
 #endif
 }
 
@@ -507,6 +460,7 @@ QString CSwordBackend::getPrivateSwordConfigFile() const {
 // Return a list of used Sword dirs. Useful for the installer.
 QStringList CSwordBackend::swordDirList() const {
     namespace DU = util::directory;
+    using SLCI = QStringList::const_iterator;
 
     // Get the set of sword directories that could contain modules:
     QSet<QString> swordDirSet;
@@ -534,19 +488,20 @@ QStringList CSwordBackend::swordDirList() const {
     }
 
     // Search the sword.conf file(s) for sword directories that could contain modules
-    for (auto const & filename : configs) {
-        if (!QFileInfo(filename).exists())
+    for (SLCI it = configs.begin(); it != configs.end(); ++it) {
+        if (!QFileInfo(*it).exists())
             continue;
 
         /*
           Get all DataPath and AugmentPath entries from the config file and add
           them to the list:
         */
-        sword::SWConfig conf(filename.toUtf8().constData());
+        sword::SWConfig conf(it->toUtf8().constData());
         swordDirSet << QDir(QTextCodec::codecForLocale()->toUnicode(conf["Install"]["DataPath"].c_str())).absolutePath();
 
         const sword::ConfigEntMap group(conf["Install"]);
-        for (auto its = group.equal_range("AugmentPath");
+        using CEMCI = sword::ConfigEntMap::const_iterator ;
+        for (std::pair<CEMCI, CEMCI> its = group.equal_range("AugmentPath");
              its.first != its.second;
              ++(its.first))
         {
@@ -566,7 +521,7 @@ QStringList CSwordBackend::swordDirList() const {
 
 void CSwordBackend::deleteOrphanedIndices() {
     const QStringList entries = QDir(CSwordModuleInfo::getGlobalBaseIndexLocation()).entryList(QDir::Dirs);
-    for (auto const & entry : entries) {
+    Q_FOREACH(const QString & entry, entries) {
         if (entry == "." || entry == "..")
             continue;
         if (CSwordModuleInfo * const module = findModuleByName(entry)) {

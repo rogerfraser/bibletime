@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -24,8 +24,8 @@
 #include "../backend/managers/referencemanager.h"
 #include "../backend/managers/cdisplaytemplatemgr.h"
 #include "../backend/rendering/centrydisplay.h"
+#include "../backend/rendering/chtmlexportrendering.h"
 #include "../backend/rendering/cplaintextexportrendering.h"
-#include "../backend/rendering/ctextrendering.h"
 #include "../util/btassert.h"
 #include "../util/tool.h"
 #include "btprinter.h"
@@ -88,10 +88,11 @@ bool CExportManager::saveKey(CSwordKey const * const key,
                 dynamic_cast<CSwordVerseKey const *>(key);
         auto const render = newRenderer(format, addText);
         if (vk && vk->isBoundSet()) {
-            text = render->renderKeyRange(vk->lowerBound(),
-                                          vk->upperBound(),
-                                          modules);
-            QString chapterTitle  = vk->bookName() + " " + QString::number(vk->chapter());
+            text = render->renderKeyRange(
+                        QString::fromUtf8(vk->getLowerBound()),
+                        QString::fromUtf8(vk->getUpperBound()),
+                        modules);
+            QString chapterTitle  = QString(vk->getBookName()) + " " + QString::number(vk->getChapter());
             text.replace("#CHAPTERTITLE#", chapterTitle);
         } else { // no range supported
             text = render->renderSingleKey(key->key(), modules);
@@ -101,12 +102,12 @@ bool CExportManager::saveKey(CSwordKey const * const key,
     return true;
 }
 
-bool CExportManager::saveKeyList(CSwordModuleSearch::ModuleResultList const & l,
+bool CExportManager::saveKeyList(sword::ListKey const & l,
                                  CSwordModuleInfo const * module,
                                  Format const format,
                                  bool const addText)
 {
-    if (l.empty())
+    if (!l.getCount())
         return false;
 
     QString const filename = getSaveFileName(format);
@@ -115,17 +116,20 @@ bool CExportManager::saveKeyList(CSwordModuleSearch::ModuleResultList const & l,
 
     CTextRendering::KeyTree tree; /// \todo Verify that items in tree are properly freed.
 
-    setProgressRange(l.size()); /// \todo check size
+    setProgressRange(l.getCount());
     KTI::Settings itemSettings;
     itemSettings.highlight = false;
 
-    for (auto const & keyPtr : l) {
+    sword::ListKey list(l);
+    list.setPosition(sword::TOP);
+    while (!list.popError()) {
         if (progressWasCancelled())
             return false;
-        tree.emplace_back(QString::fromLocal8Bit(keyPtr->getText()),
-                          module,
-                          itemSettings);
+        tree.append(new KTI(QString::fromLocal8Bit(list.getText()),
+                            module,
+                            itemSettings));
         incProgress();
+        list.increment();
     }
 
     QString const text = newRenderer(format, addText)->renderKeyTree(tree);
@@ -154,7 +158,7 @@ bool CExportManager::saveKeyList(QList<CSwordKey *> const & list,
     for (CSwordKey const * const k : list) {
         if (progressWasCancelled())
             return false;
-        tree.emplace_back(k->key(), k->module(), itemSettings);
+        tree.append(new KTI(k->key(), k->module(), itemSettings));
         incProgress();
     };
 
@@ -187,9 +191,11 @@ bool CExportManager::copyKey(CSwordKey const * const key,
         CSwordVerseKey const * const vk =
                 dynamic_cast<CSwordVerseKey const *>(key);
         if (vk && vk->isBoundSet()) {
-            text = render->renderKeyRange(vk->lowerBound(),
-                                          vk->upperBound(),
-                                          modules);
+            text = render->renderKeyRange(
+                       QString::fromUtf8(vk->getLowerBound()),
+                       QString::fromUtf8(vk->getUpperBound()),
+                       modules
+                   );
         } else { // no range supported
             text = render->renderSingleKey(key->key(), modules);
         }
@@ -199,24 +205,27 @@ bool CExportManager::copyKey(CSwordKey const * const key,
     return true;
 }
 
-bool CExportManager::copyKeyList(CSwordModuleSearch::ModuleResultList const & l,
+bool CExportManager::copyKeyList(sword::ListKey const & l,
                                  CSwordModuleInfo const * const module,
                                  Format const format,
                                  bool const addText)
 {
-    if (l.empty())
+    sword::ListKey list = l;
+    if (!list.getCount())
         return false;
 
     CTextRendering::KeyTree tree; /// \todo Verify that items in tree are properly freed.
     KTI::Settings itemSettings;
     itemSettings.highlight = false;
 
-    for (auto const & keyPtr : l) {
+    list.setPosition(sword::TOP);
+    while (!list.popError()) {
         if (progressWasCancelled())
             return false;
-        tree.emplace_back(QString::fromLocal8Bit(keyPtr->getText()),
-                          module,
-                          itemSettings);
+        tree.append(new KTI(QString::fromLocal8Bit(list.getText()),
+                            module,
+                            itemSettings));
+        list.increment();
     }
 
     copyToClipboard(newRenderer(format, addText)->renderKeyTree(tree));
@@ -224,24 +233,27 @@ bool CExportManager::copyKeyList(CSwordModuleSearch::ModuleResultList const & l,
     return true;
 }
 
-bool CExportManager::pipeKeyList(CSwordModuleSearch::ModuleResultList const & l,
+bool CExportManager::pipeKeyList(sword::ListKey const & l,
                                  CSwordModuleInfo const * const module,
                                  Format const format,
                                  bool const addText)
 {
-    if (l.empty())
+    sword::ListKey list = l;
+    if (!list.getCount())
         return false;
 
     CTextRendering::KeyTree tree; /// \todo Verify that items in tree are properly freed.
     KTI::Settings itemSettings;
     itemSettings.highlight = false;
 
-    for (auto const & keyPtr : l) {
+    list.setPosition(sword::TOP);
+    while (!list.popError()) {
         if (progressWasCancelled())
             return false;
-        tree.emplace_back(QString::fromLocal8Bit(keyPtr->getText()),
-                          module,
-                          itemSettings);
+        tree.append(new KTI(QString::fromLocal8Bit(list.getText()),
+                            module,
+                            itemSettings));
+        list.increment();
     }
 
     closeProgressDialog();
@@ -283,7 +295,7 @@ bool CExportManager::copyKeyList(QList<CSwordKey *> const & list,
     for (CSwordKey const * const k : list) {
         if (progressWasCancelled())
             return false;
-        tree.emplace_back(k->key(), k->module(), itemSettings);
+        tree.append(new KTI(k->key(), k->module(), itemSettings));
         incProgress();
     };
 
@@ -307,7 +319,7 @@ bool CExportManager::pipeKeyList(QList<CSwordKey *> const & list,
     for (CSwordKey const * const k : list) {
         if (progressWasCancelled())
             return false;
-        tree.emplace_back(k->key(), k->module(), itemSettings);
+        tree.append(new KTI(k->key(), k->module(), itemSettings));
         incProgress();
     };
 
@@ -354,7 +366,7 @@ bool CExportManager::printKey(CSwordKey const * const key,
 {
     PrintSettings settings{displayOptions};
     BtPrinter::KeyTree tree; /// \todo Verify that items in tree are properly freed.
-    tree.emplace_back(key->key(), key->module(), settings);
+    tree.append(new BtPrinter::KeyTreeItem(key->key(), key->module(), settings));
     BtPrinter{displayOptions, filterOptions}.printKeyTree(tree);
     return true;
 }
@@ -366,11 +378,11 @@ bool CExportManager::printKey(CSwordModuleInfo const * const module,
                               FilterOptions const & filterOptions)
 {
     PrintSettings settings{displayOptions};
-    BtPrinter::KeyTree tree;
+    BtPrinter::KeyTree tree; /// \todo Verify that items in tree are properly freed.
     if (startKey != stopKey) {
-        tree.emplace_back(startKey, stopKey, module, settings);
+        tree.append(new BtPrinter::KeyTreeItem(startKey, stopKey, module, settings));
     } else {
-        tree.emplace_back(startKey, module, settings);
+        tree.append(new BtPrinter::KeyTreeItem(startKey, module, settings));
     }
     BtPrinter{displayOptions, filterOptions}.printKeyTree(tree);
     return true;
@@ -380,14 +392,18 @@ bool CExportManager::printByHyperlink(QString const & hyperlink,
                                       DisplayOptions const & displayOptions,
                                       FilterOptions const & filterOptions)
 {
-    auto const decodedLink(ReferenceManager::decodeHyperlink(hyperlink));
-    if (!decodedLink && !decodedLink->module)
-        return false;
-    auto const * const module = decodedLink->module;
-    auto const & keyName = decodedLink->key;
+    QString moduleName;
+    QString keyName;
+    ReferenceManager::Type type;
+    ReferenceManager::decodeHyperlink(hyperlink, moduleName, keyName, type);
+    if (moduleName.isEmpty())
+        moduleName = ReferenceManager::preferredModule(type);
 
     BtPrinter::KeyTree tree; /// \todo Verify that items in tree are properly freed.
     PrintSettings settings{displayOptions};
+    CSwordModuleInfo const * module =
+            CSwordBackend::instance()->findModuleByName(moduleName);
+    BT_ASSERT(module);
     //check if we have a range of entries or a single one
     if ((module->type() == CSwordModuleInfo::Bible)
         || (module->type() == CSwordModuleInfo::Commentary))
@@ -402,51 +418,52 @@ bool CExportManager::printByHyperlink(QString const & hyperlink,
             if (sword::VerseKey const * const element =
                     dynamic_cast<sword::VerseKey const *>(verses.getElement(i)))
             {
-                tree.emplace_back(
-                            QString::fromUtf8(
-                                element->getLowerBound().getText()),
-                            QString::fromUtf8(
-                                element->getUpperBound().getText()),
-                            module,
-                            settings);
+                tree.append(
+                        new BtPrinter::KeyTreeItem(
+                                QString::fromUtf8(
+                                        element->getLowerBound().getText()),
+                                QString::fromUtf8(
+                                        element->getUpperBound().getText()),
+                                module,
+                                settings) );
             } else if (verses.getElement(i)) {
-                tree.emplace_back(
+                tree.append(
+                        new BtPrinter::KeyTreeItem(
                             QString::fromUtf8(verses.getElement(i)->getText()),
                             module,
-                            settings);
+                            settings) );
             }
         }
     } else {
-        tree.emplace_back(keyName, module, settings);
+        tree.append(new BtPrinter::KeyTreeItem(keyName, module, settings));
     }
     BtPrinter{displayOptions, filterOptions}.printKeyTree(tree);
     return true;
 }
 
-bool CExportManager::printKeyList(
-        CSwordModuleSearch::ModuleResultList const & list,
-        CSwordModuleInfo const * const module,
-        DisplayOptions const & displayOptions,
-        FilterOptions const & filterOptions)
+bool CExportManager::printKeyList(sword::ListKey const & list,
+                                  CSwordModuleInfo const * const module,
+                                  DisplayOptions const & displayOptions,
+                                  FilterOptions const & filterOptions)
 {
-    if (list.empty())
+    if (!list.getCount())
         return false;
     PrintSettings settings{displayOptions};
     BtPrinter::KeyTree tree; /// \todo Verify that items in tree are properly freed.
 
-    setProgressRange(list.size());
-    for (auto const & keyPtr : list) {
+    setProgressRange(list.getCount());
+    for (int i = 0; i < list.getCount(); i++) {
         if (progressWasCancelled())
             return false;
-        sword::SWKey const * const swKey = keyPtr.get();
+        sword::SWKey const * const swKey = list.getElement(i);
         if (sword::VerseKey const * const vKey =
                     dynamic_cast<const sword::VerseKey*>(swKey))
         {
             QString const startKey = vKey->getText();
-            tree.emplace_back(startKey, startKey, module, settings);
+            tree.append(new KTI(startKey, startKey, module, settings));
         } else {
             QString const key = swKey->getText();
-            tree.emplace_back(key, key, module, settings);
+            tree.append(new KTI(key, key, module, settings));
         }
         incProgress();
     }
@@ -470,7 +487,7 @@ bool CExportManager::printKeyList(QStringList const & list,
     for (QString const & key: list) {
         if (progressWasCancelled())
             return false;
-        tree.emplace_back(key, module, settings);
+        tree.append(new BtPrinter::KeyTreeItem(key, module, settings));
         incProgress();
     }
     BtPrinter{displayOptions, filterOptions}.printKeyTree(tree);
@@ -512,9 +529,9 @@ std::unique_ptr<CTextRendering> CExportManager::newRenderer(Format const format,
     using R = std::unique_ptr<CTextRendering>;
     BT_ASSERT((format == Text) || (format == HTML));
     if (format == HTML)
-        return R{new CTextRendering(addText,
-                                    m_displayOptions,
-                                    filterOptions)};
+        return R{new CHTMLExportRendering(addText,
+                                          m_displayOptions,
+                                          filterOptions)};
     return R{new CPlainTextExportRendering(addText,
                                            m_displayOptions,
                                            filterOptions)};

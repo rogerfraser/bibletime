@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -23,77 +23,93 @@
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QVBoxLayout>
-#include <utility>
 #include "../displaywindow/btactioncollection.h"
 #include "../../util/btconnect.h"
 #include "btshortcutsdialog.h"
 
 
-namespace {
+// *************** BtShortcutsEditorItem *******************************************************************
+// BtShortcutsEditorItem is the widget for the first column of the BtShortcutsEditor
+// It holds extra information about the action
 
-/** Widget for the first column of the BtShortcutsEditor holding extra
-    information about the action. */
 class BtShortcutsEditorItem : public QTableWidgetItem {
+    public:
+        BtShortcutsEditorItem(QAction* action);
+        ~BtShortcutsEditorItem();
+        void commitChanges();
+        QKeySequence getDefaultKeys();
+        void setDefaultKeys(QKeySequence keys);
+        void setFirstHotkey(QKeySequence keys);
+        void setSecondHotkey(const QString& keys);
+        QAction* getAction();
+        void deleteHotkeys();
 
-public: /* Methods: */
-
-    BtShortcutsEditorItem(QAction * action,
-                          QKeySequence defaultKeys)
-        : m_action(action)
-        , m_defaultKeys(std::move(defaultKeys))
-    {
-        setText(action->text().replace(QRegExp("&(.)"), "\\1"));
-        setIcon(action->icon());
-        setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-
-        QList<QKeySequence> list = m_action->shortcuts();
-        if (list.count() > 0)
-            m_newFirstHotkey = list.at(0);
-        if (list.count() > 1)
-            m_newSecondHotkey = list.at(1);
-    }
-
-    void commitChanges() {
-        if (!m_action)
-            return;
-        QList<QKeySequence> list;
-        if (!m_newFirstHotkey.isEmpty())
-            list << m_newFirstHotkey;
-        if (!m_newSecondHotkey.isEmpty())
-            list << m_newSecondHotkey;
-
-        m_action->setShortcuts(list);
-    }
-
-    QKeySequence getDefaultKeys() const { return m_defaultKeys; }
-
-    template <typename ... Args>
-    void setFirstHotkey(Args && ... args)
-    { m_newFirstHotkey = QKeySequence(std::forward<Args>(args)...); }
-
-    template <typename ... Args>
-    void setSecondHotkey(Args && ... args)
-    { m_newSecondHotkey = QKeySequence(std::forward<Args>(args)...); }
-
-    void deleteHotkeys() noexcept {
-        m_newFirstHotkey = QKeySequence();
-        m_newSecondHotkey = QKeySequence();
-    }
-
-private: /* Fields: */
-
-    QAction *m_action;
-    QKeySequence m_newFirstHotkey;
-    QKeySequence m_newSecondHotkey;
-    QKeySequence m_defaultKeys;
-
+    private:
+        QAction *m_action;
+        QKeySequence *m_newFirstHotkey;
+        QKeySequence *m_newSecondHotkey;
+        QKeySequence m_defaultKeys;
 };
 
-// Get the shortcut editor item from the zeroth column of the table:
-inline auto getShortcutsEditor(QTableWidget const & tableWidget, int const row)
-{ return dynamic_cast<BtShortcutsEditorItem *>(tableWidget.item(row, 0)); }
+BtShortcutsEditorItem::BtShortcutsEditorItem(QAction* action)
+        : m_action(action), m_newFirstHotkey(nullptr), m_newSecondHotkey(nullptr) {
+    QList<QKeySequence> list = m_action->shortcuts();
+    if (list.count() > 0)
+        m_newFirstHotkey = new QKeySequence(list.at(0));
+    if (list.count() > 1)
+        m_newSecondHotkey = new QKeySequence(list.at(1));
+}
 
-} // anonymous namespace
+BtShortcutsEditorItem::~BtShortcutsEditorItem() {
+    delete m_newFirstHotkey;
+    delete m_newSecondHotkey;
+}
+
+QAction* BtShortcutsEditorItem::getAction() {
+    return m_action;
+}
+
+QKeySequence BtShortcutsEditorItem::getDefaultKeys() {
+    return m_defaultKeys;
+}
+
+void BtShortcutsEditorItem::setDefaultKeys(QKeySequence keys) {
+    m_defaultKeys = keys;
+}
+
+void BtShortcutsEditorItem::setFirstHotkey(QKeySequence keys) {
+    if (m_newFirstHotkey == nullptr)
+        m_newFirstHotkey = new QKeySequence();
+    *m_newFirstHotkey = keys;
+}
+
+void BtShortcutsEditorItem::setSecondHotkey(const QString& keys) {
+    if (m_newSecondHotkey == nullptr)
+        m_newSecondHotkey = new QKeySequence();
+    *m_newSecondHotkey = QKeySequence(keys);
+}
+
+// Deletes hotkey information
+void BtShortcutsEditorItem::deleteHotkeys() {
+    delete m_newFirstHotkey;
+    m_newFirstHotkey = nullptr;
+    delete m_newSecondHotkey;
+    m_newSecondHotkey = nullptr;
+}
+
+// Moves the hotkey information into the QAction variable
+void BtShortcutsEditorItem::commitChanges() {
+    QList<QKeySequence> list;
+    if ( (m_newFirstHotkey != nullptr) && (*m_newFirstHotkey != QKeySequence()) ) {
+        list << *m_newFirstHotkey;
+    }
+    if ( (m_newSecondHotkey != nullptr) && (*m_newSecondHotkey != QKeySequence()) )
+        list << *m_newSecondHotkey;
+
+    if (m_action != nullptr)
+        m_action->setShortcuts(list);
+}
+
 
 // ******************* BtShortcutsEditor *******************************************************
 
@@ -109,18 +125,17 @@ BtShortcutsEditor::BtShortcutsEditor(BtActionCollection* collection, QWidget* pa
     m_table->setColumnCount(3);
     m_table->setAlternatingRowColors(true);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_table->setSelectionMode(QAbstractItemView::SingleSelection);
-    m_table->setHorizontalHeaderLabels({tr("Action"),
-                                        tr("Shortcut"),
-                                        tr("Alternate")});
+    m_table->setHorizontalHeaderLabels({tr("Action\nname"),
+                                        tr("First\nshortcut"),
+                                        tr("Second\nshortcut")});
     m_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
     m_table->horizontalHeader()->resizeSection(0, 180);
     m_table->horizontalHeader()->resizeSection(1, 100);
     m_table->horizontalHeader()->setStretchLastSection(true);
     m_table->verticalHeader()->setVisible(false);
     m_table->setShowGrid(false);
-    BT_CONNECT(m_table, &QTableWidget::itemSelectionChanged,
-               this,    &BtShortcutsEditor::slotSelectionChanged);
+    BT_CONNECT(m_table, &QTableWidget::cellClicked,
+               this,    &BtShortcutsEditor::changeRow);
     vBox->addWidget(m_table);
 
     // Create the area below the table where the shortcuts are edited:
@@ -152,8 +167,6 @@ BtShortcutsEditor::BtShortcutsEditor(BtActionCollection* collection, QWidget* pa
 
             m_customPushButton = new QPushButton(m_shortcutChooser);
             m_customPushButton->setMinimumWidth(140);
-            BT_CONNECT(m_customPushButton, &QPushButton::clicked,
-                       this, &BtShortcutsEditor::customButtonClicked);
             hLayout->addWidget(m_customPushButton);
 
             hLayout->addItem(new QSpacerItem(1,
@@ -184,10 +197,14 @@ BtShortcutsEditor::BtShortcutsEditor(BtActionCollection* collection, QWidget* pa
             m_table->insertRow(count);
 
             {
-                auto * const item =
-                        new BtShortcutsEditorItem(&action, defaultKeys);
+                BtShortcutsEditorItem * const item =
+                        new BtShortcutsEditorItem{&action};
                 try {
                     /// \todo Remove this & hack and use Qt properties instead:
+                    item->setText(action.text().replace(QRegExp("&(.)"), "\\1"));
+                    item->setIcon(action.icon());
+                    item->setDefaultKeys(defaultKeys);
+                    item->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
                     m_table->setItem(count, 0, item);
                 } catch (...) {
                     delete item;
@@ -227,35 +244,42 @@ BtShortcutsEditor::BtShortcutsEditor(BtActionCollection* collection, QWidget* pa
         });
     m_table->sortItems(0);
     m_table->selectRow(0);
-    slotSelectionChanged();
+    changeRow(0, 0);
     BT_CONNECT(m_dlg, &BtShortcutsDialog::keyChangeRequest,
-               [this](QKeySequence const & keys) {
-                   Q_EMIT keyChangeRequest(
-                               m_table->item(m_currentRow, 0)->text(),
-                               keys);
-               });
+               this,  &BtShortcutsEditor::makeKeyChangeRequest);
+}
+
+// get the shortcut editor item from the zeroth column of the table
+BtShortcutsEditorItem* BtShortcutsEditor::getShortcutsEditor(int row) {
+    QTableWidgetItem* item = m_table->item(row, 0);
+    BtShortcutsEditorItem* btItem = dynamic_cast<BtShortcutsEditorItem*>(item);
+    return btItem;
 }
 
 // saves shortcut keys into the QAction
 void BtShortcutsEditor::commitChanges() {
-    int const rows = m_table->rowCount();
-    for (int row = 0; row < rows; row++)
-        if (auto * const btItem = getShortcutsEditor(*m_table, row))
+    int rows = m_table->rowCount();
+    for (int row = 0; row < rows; row++) {
+        BtShortcutsEditorItem* btItem = getShortcutsEditor(row);
+        if (btItem != nullptr)
             btItem->commitChanges();
+    }
 }
 
 // called when a different action name row is selected
-void BtShortcutsEditor::slotSelectionChanged() {
-    m_currentRow = m_table->currentRow();
-    auto & item = *getShortcutsEditor(*m_table, m_currentRow);
-    auto const defaultKeys = item.getDefaultKeys();
+void BtShortcutsEditor::changeRow(int row, int column) {
+    Q_UNUSED(column); /// \todo Is this correct?
+
+    BtShortcutsEditorItem* item = getShortcutsEditor(row);
+    m_currentRow = row;
+    QKeySequence defaultKeys = item->getDefaultKeys();
 
     m_defaultLabelValue->setText(defaultKeys.toString());
 
-    QTableWidgetItem* item1 = m_table->item(m_currentRow, 1);
+    QTableWidgetItem* item1 = m_table->item(row, 1);
     QString shortcut = item1->text();
 
-    QTableWidgetItem* item2 = m_table->item(m_currentRow, 2);
+    QTableWidgetItem* item2 = m_table->item(row, 2);
     QString alternate = item2->text();
 
     QString bothKeys = shortcut;
@@ -273,28 +297,28 @@ void BtShortcutsEditor::slotSelectionChanged() {
 
 // called when the none radio button is clicked
 void BtShortcutsEditor::noneButtonClicked(bool checked) {
-    Q_UNUSED(checked) /// \todo Is this correct?
+    Q_UNUSED(checked); /// \todo Is this correct?
 
     if (m_currentRow < 0)
         return;
-    auto & item = *getShortcutsEditor(*m_table, m_currentRow);
+    BtShortcutsEditorItem* item = getShortcutsEditor(m_currentRow);
     m_customPushButton->setText("");
-    item.deleteHotkeys();
-    item.setFirstHotkey();
+    item->deleteHotkeys();
+    item->setFirstHotkey(QKeySequence(""));
     m_table->item(m_currentRow, 1)->setText("");
     m_table->item(m_currentRow, 2)->setText("");
 }
 
 // called when the default radio button is clicked
 void BtShortcutsEditor::defaultButtonClicked(bool checked) {
-    Q_UNUSED(checked) /// \todo Is this correct?
+    Q_UNUSED(checked); /// \todo Is this correct?
 
     if (m_currentRow < 0)
         return;
-    auto & item = *getShortcutsEditor(*m_table, m_currentRow);
-    auto const defaultKeys = item.getDefaultKeys();
-    item.deleteHotkeys();
-    item.setFirstHotkey(defaultKeys);
+    BtShortcutsEditorItem* item = getShortcutsEditor(m_currentRow);
+    QKeySequence defaultKeys = item->getDefaultKeys();
+    item->deleteHotkeys();
+    item->setFirstHotkey(defaultKeys);
     m_customPushButton->setText(defaultKeys.toString());
     m_table->item(m_currentRow, 1)->setText(defaultKeys.toString());
     m_table->item(m_currentRow, 2)->setText("");
@@ -302,7 +326,7 @@ void BtShortcutsEditor::defaultButtonClicked(bool checked) {
 
 // called when the custom radio button is clicked
 void BtShortcutsEditor::customButtonClicked(bool checked) {
-    Q_UNUSED(checked) /// \todo Is this correct?
+    Q_UNUSED(checked); /// \todo Is this correct?
 
     if (m_currentRow < 0)
         return;
@@ -317,42 +341,51 @@ void BtShortcutsEditor::customButtonClicked(bool checked) {
         QString newAltKeys = m_dlg->getSecondKeys();
         if (newPriKeys == newAltKeys)
             newAltKeys = "";
-        auto & item = *getShortcutsEditor(*m_table, m_currentRow);
-        item.setFirstHotkey(newPriKeys);
-        item.setSecondHotkey(newAltKeys);
+        BtShortcutsEditorItem* item = getShortcutsEditor(m_currentRow);
+        item->setFirstHotkey(newPriKeys);
+        item->setSecondHotkey(newAltKeys);
         m_table->item(m_currentRow, 1)->setText(newPriKeys);
         m_table->item(m_currentRow, 2)->setText(newAltKeys);
     }
 }
 
+// complete the keyChangeRequest
+void BtShortcutsEditor::makeKeyChangeRequest(const QString& keys) {
+    // signal the application that this BtShortcutsEditor wants to change this shortcut (keys)
+    // The application will check other BtShortcutsEditors and put out a message if the shortcut
+    // is already in use. If the user requests reassignment, the application calls the BtShortcutsEditors to
+    // reassign and set the shortcut.
+    keyChangeRequest(this, keys);
+}
+
 // used by application to complete the keyChangeRequest signal
 // stores "keys" into the custom shortcuts dialog field
-void BtShortcutsEditor::changeShortcutInDialog(QKeySequence const & keys)
-{ m_dlg->changeSelectedShortcut(keys); }
+void BtShortcutsEditor::changeShortcutInDialog(const QString& keys) {
+    m_dlg->changeSelectedShortcut(keys);
+}
 
 // clears any shortcut keys in the table matching the specified keys
-void BtShortcutsEditor::clearConflictWithKeys(QKeySequence const & keys) {
-    auto const keyString(keys.toString());
+void BtShortcutsEditor::clearConflictWithKeys(const QString& keys) {
+    QString conflict;
     for (int row = 0; row < m_table->rowCount(); row++) {
-        auto & item = *getShortcutsEditor(*m_table, row);
-        if (m_table->item(row, 1)->text() == keyString) {
+        BtShortcutsEditorItem* item = getShortcutsEditor(row);
+        if (m_table->item(row, 1)->text() == keys) {
             m_table->item(row, 1)->setText("");
-            item.setFirstHotkey();
+            item->setFirstHotkey(QKeySequence(""));
         }
-        if (m_table->item(row, 2)->text() == keyString) {
+        if (m_table->item(row, 2)->text() == keys) {
             m_table->item(row, 2)->setText("");
-            item.setSecondHotkey();
+            item->setSecondHotkey(QKeySequence("").toString());
         }
     }
 }
 
 // finds any shortcut keys in the table matching the specified keys - returns the Action Name for it.
-QString
-BtShortcutsEditor::findConflictWithKeys(QKeySequence const & keys) const {
-    auto const keyString(keys.toString());
-    for (int i = 0; i < m_table->rowCount(); i++)
-        if ((m_table->item(i, 1)->text() == keyString)
-            || (m_table->item(i, 2)->text() == keyString))
+QString BtShortcutsEditor::findConflictWithKeys(const QString& keys) {
+    QString conflict;
+    for (int i = 0; i < m_table->rowCount(); i++) {
+        if ( (m_table->item(i, 1)->text() == keys) || (m_table->item(i, 2)->text() == keys) )
             return m_table->item(i, 0)->text();
-    return {};
+    }
+    return conflict;
 }

@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTINSTALLTHREAD_H
+#define BTINSTALLTHREAD_H
 
 #include <QThread>
 
@@ -49,7 +50,7 @@ class BtInstallThread: public QThread {
         void stopInstall()
         { m_stopRequested.store(true, std::memory_order_relaxed); }
 
-    Q_SIGNALS:
+    signals:
 
         /** Emitted when starting the installation. */
         void preparingInstall(int moduleIndex);
@@ -72,7 +73,7 @@ class BtInstallThread: public QThread {
         void installModule();
         bool removeModule();
 
-    private Q_SLOTS:
+    private slots:
 
         void slotDownloadStarted();
         void slotManagerStatusUpdated(int totalProgress, int fileProgress);
@@ -86,3 +87,5 @@ class BtInstallThread: public QThread {
         std::atomic<bool> m_stopRequested;
 
 };
+
+#endif

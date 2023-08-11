@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -33,12 +33,12 @@ BtSearchSyntaxHelpDialog::BtSearchSyntaxHelpDialog(QWidget *parent, Qt::WindowFl
     QFont font = m_textBrowser->font();
     font.setPointSize(font.pointSize()+2);
     m_textBrowser->setFont(font);
-    BT_CONNECT(m_textBrowser, &QTextBrowser::anchorClicked,
-               [](QUrl const & url) { QDesktopServices::openUrl(url); });
+    BT_CONNECT(m_textBrowser, SIGNAL(anchorClicked(QUrl)),
+               this,      SLOT(linkClicked(QUrl)));
     l->addWidget(m_textBrowser);
 
     m_buttons = new QDialogButtonBox(QDialogButtonBox::Close, Qt::Horizontal, this);
-    BT_CONNECT(m_buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    BT_CONNECT(m_buttons, SIGNAL(rejected()), this, SLOT(reject()));
     l->addWidget(m_buttons);
 
     setLayout(l);
@@ -81,7 +81,7 @@ void BtSearchSyntaxHelpDialog::retranslateUi() {
         "}td{"
             "padding:0.2em 0.3em;"
             "border:3px solid ";
-    html += palette().color(QPalette::WindowText).name();
+    html += palette().color(QPalette::Foreground).name();
     html += ";"
             "color:";
     html += palette().color(QPalette::Text).name();
@@ -218,6 +218,10 @@ void BtSearchSyntaxHelpDialog::retranslateUi() {
     m_textBrowser->setHtml(html);
 
     message::prepareDialogBox(m_buttons);
+}
+
+void BtSearchSyntaxHelpDialog::linkClicked(const QUrl &url) {
+    QDesktopServices::openUrl(url);
 }
 
 } // namespace Search

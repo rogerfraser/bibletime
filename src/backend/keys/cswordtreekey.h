@@ -2,25 +2,21 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CSWORDTREEKEYIDX_H
+#define CSWORDTREEKEYIDX_H
 
 #include "cswordkey.h"
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wextra-semi"
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <treekeyidx.h>
-#pragma GCC diagnostic pop
 
 
 class CSwordModuleInfo;
@@ -30,30 +26,9 @@ class CSwordModuleInfo;
  * @author The BibleTime team
  */
 
-class CSwordTreeKey final : public CSwordKey {
-
-    public: /* Types: */
-
-        using Offset =
-                decltype(std::declval<sword::TreeKeyIdx const &>().getOffset());
+class CSwordTreeKey : public CSwordKey, public sword::TreeKeyIdx {
 
     public:
-
-        #define BibleTime_CSwordTreeKey_DEFINE_COMP(op) \
-            friend bool operator op(CSwordTreeKey const & lhs, \
-                                    CSwordTreeKey const & rhs) \
-            { return lhs.offset() op rhs.offset(); }
-        #if __cpp_impl_three_way_comparison >= 201907L
-        BibleTime_CSwordTreeKey_DEFINE_COMP(<=>)
-        #else
-        BibleTime_CSwordTreeKey_DEFINE_COMP(<)
-        BibleTime_CSwordTreeKey_DEFINE_COMP(<=)
-        BibleTime_CSwordTreeKey_DEFINE_COMP(==)
-        BibleTime_CSwordTreeKey_DEFINE_COMP(!=)
-        BibleTime_CSwordTreeKey_DEFINE_COMP(>=)
-        BibleTime_CSwordTreeKey_DEFINE_COMP(>)
-        #endif
-        #undef BibleTime_CSwordTreeKey_DEFINE_COMP
 
         CSwordTreeKey & operator=(CSwordTreeKey const &) = delete;
 
@@ -66,11 +41,9 @@ class CSwordTreeKey final : public CSwordKey {
 
         CSwordTreeKey( const CSwordTreeKey& k );
 
-        sword::TreeKeyIdx const & asSwordKey() const noexcept final override;
+        void setModule(const CSwordModuleInfo *newModule) override;
 
-        void setModule(const CSwordModuleInfo *newModule) final override;
-
-        CSwordTreeKey* copy() const final override;
+        CSwordTreeKey* copy() const override;
 
         /**
         * Returns the TreeKeyIdx::getLocalKey value in unicode.
@@ -79,26 +52,15 @@ class CSwordTreeKey final : public CSwordKey {
         */
         QString getLocalNameUnicode();
 
-        QString key() const final override;
+        QString key() const override;
 
-        bool setKey(const QString &key) final override;
+        bool setKey(const QString &key) override;
 
-        bool setKey(const char *key) final override;
-
-        bool hasChildren() { return m_key.hasChildren(); }
-        void positionToRoot() { m_key.root(); }
-        bool positionToParent() { return m_key.parent(); }
-        bool positionToFirstChild() { return m_key.firstChild(); }
-        bool positionToNextSibling() { return m_key.nextSibling(); }
-        Offset offset() const { return m_key.getOffset(); }
-        void setOffset(Offset value) { m_key.setOffset(value); }
+        bool setKey(const char *key) override;
 
     protected:
 
-        const char * rawKey() const final override;
-
-    private: /* Fields: */
-
-        sword::TreeKeyIdx m_key;
-
+        const char * rawKey() const override;
 };
+
+#endif

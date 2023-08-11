@@ -2,21 +2,20 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef SEARCHCSEARCHANALYSISITEM_H
+#define SEARCHCSEARCHANALYSISITEM_H
 
 #include <QGraphicsRectItem>
 
-#include <cstddef>
 #include <QGraphicsScene>
-#include <memory>
 #include "../../../backend/cswordmodulesearch.h"
 
 
@@ -26,25 +25,52 @@ namespace Search {
 
 class CSearchAnalysisItem : public QGraphicsRectItem {
     public:
-        CSearchAnalysisItem(QString bookname, int numModules);
+        CSearchAnalysisItem(const int moduleCount, const QString &bookname,
+                            double *scaleFactor,
+                            const CSwordModuleSearch::Results &results);
 
-        auto const & bookName() const noexcept { return m_bookName; }
-        auto & counts() noexcept { return m_counts; }
-        auto const  & counts() const noexcept { return m_counts; }
+        ~CSearchAnalysisItem() override;
 
-        int width() const;
+        /**
+          Sets the resultcount of this item.
+        */
+        inline void setCountForModule(const int moduleIndex, const int count) {
+            m_resultCountArray[moduleIndex] = count;
+        }
 
-        void setScaleFactor(double value) noexcept { m_scaleFactor = value; }
+        /**
+          Returns the resultcount of this item.
+        */
+        inline int getCountForModule(const int moduleIndex) const {
+            return m_resultCountArray[moduleIndex];
+        }
+
+        /**
+        * Does one of the modules contain hits?
+        */
+        bool hasHitsInAnyModule();
+        /**
+        * Returns the width of this item.
+        */
+        int width();
+        /**
+        * Returns the tooltip for this item.
+        */
+        const QString getToolTip();
 
     private:
         void paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*) override;
 
     private: /* Fields: */
-        double m_scaleFactor = 0.0;
-        QString const m_bookName;
-        QVector<std::size_t> m_counts;
-        std::unique_ptr<QPixmap> m_bufferPixmap;
+        CSwordModuleSearch::Results m_results;
+        double *m_scaleFactor;
+        QString m_bookName;
+        int m_moduleCount;
+        QVector<int> m_resultCountArray;
+        QPixmap* m_bufferPixmap;
 
 };
 
 }
+
+#endif

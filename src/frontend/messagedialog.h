@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef UTIL_DIALOG_UTIL_H
+#define UTIL_DIALOG_UTIL_H
 
 #include <QMessageBox>
 
@@ -45,3 +46,5 @@ QMessageBox::StandardButton showInformation(QWidget * parent, const QString & ti
 QMessageBox::StandardButton showQuestion(QWidget * parent, const QString & title, const QString & text, QMessageBox::StandardButtons buttons = QMessageBox::Ok, QMessageBox::StandardButton defaultButton = QMessageBox::NoButton);
 
 } // namespace message
+
+#endif

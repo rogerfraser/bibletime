@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -42,7 +42,8 @@ CBookKeyChooser::CBookKeyChooser(const BtConstModuleList & modules,
     setKey(key);
 
     adjustFont();
-    BT_CONNECT(this, &CBookKeyChooser::keyChanged, history(), &BTHistory::add);
+    BT_CONNECT(this,      SIGNAL(keyChanged(CSwordKey *)),
+               history(), SLOT(add(CSwordKey *)));
 }
 
 void CBookKeyChooser::setKey(CSwordKey * newKey) {
@@ -57,11 +58,11 @@ void CBookKeyChooser::setKey(CSwordKey * newKey, const bool emitSignal) {
     QString oldKey(m_key->key());
 
     if (oldKey.isEmpty()) { // Don't set keys equal to "/", always use a key which may have content
-        m_key->positionToFirstChild();
+        m_key->firstChild();
         oldKey = m_key->key();
     }
 
-    auto const oldOffset = m_key->offset();
+    const int oldOffset = m_key->getOffset();
 
     QStringList siblings; // Split up key
     if (m_key && !oldKey.isEmpty())
@@ -73,9 +74,9 @@ void CBookKeyChooser::setKey(CSwordKey * newKey, const bool emitSignal) {
 
     int depth = 0;
 
-    m_key->positionToRoot(); //start iteration at root node
+    m_key->root(); //start iteration at root node
 
-    while (m_key->positionToFirstChild() && (depth < siblings.count())) {
+    while (m_key->firstChild() && (depth < siblings.count())) {
         QString key = m_key->key();
         int index = (depth == 0) ? -1 : 0;
 
@@ -84,7 +85,7 @@ void CBookKeyChooser::setKey(CSwordKey * newKey, const bool emitSignal) {
         do { //look for matching sibling
             ++index;
             found = (m_key->getLocalNameUnicode() == siblings[depth]);
-        } while (!found && m_key->positionToNextSibling());
+        } while (!found && m_key->nextSibling());
 
         if (found) {
             key = m_key->key(); //found: change key to this level
@@ -96,7 +97,7 @@ void CBookKeyChooser::setKey(CSwordKey * newKey, const bool emitSignal) {
 
         //last iteration: check to see if another box can be filled with child entries
         if (depth == siblings.count() - 1 && m_key->hasChildren()) {
-            m_key->positionToFirstChild();
+            m_key->firstChild();
             setupCombo(m_key->key(), ++depth, 0);
         }
 
@@ -111,14 +112,14 @@ void CBookKeyChooser::setKey(CSwordKey * newKey, const bool emitSignal) {
     }
 
     if (oldKey.isEmpty()) {
-        m_key->positionToRoot();
+        m_key->root();
     } else {
         //m_key->key(oldKey);
         m_key->setOffset(oldOffset);
     }
 
     if (emitSignal)
-        Q_EMIT keyChanged(m_key);
+        emit keyChanged(m_key);
 }
 
 /** Returns the key of this kechooser. */
@@ -134,7 +135,7 @@ void CBookKeyChooser::setModules(const BtConstModuleList & modules,
     m_modules.clear();
 
     //   for (modules.first(); modules.current(); modules.next()) {
-    for (auto const * const m : modules) {
+    Q_FOREACH(const CSwordModuleInfo * const m, modules) {
         if (m->type() == CSwordModuleInfo::GenericBook ) {
             const CSBMI * const book = dynamic_cast<const CSBMI *>(m);
             if (book != nullptr)
@@ -175,10 +176,8 @@ void CBookKeyChooser::setModules(const BtConstModuleList & modules,
             w->comboBox().setMaximumWidth(maxWidth);
             w->comboBox().setCurrentIndex(0);
 
-            BT_CONNECT(w, &CKeyChooserWidget::changed,
-                       this, &CBookKeyChooser::keyChooserChanged);
-            BT_CONNECT(w, &CKeyChooserWidget::focusOut,
-                       this, &CBookKeyChooser::keyChooserChanged);
+            BT_CONNECT(w, SIGNAL(changed(int)),  SLOT(keyChooserChanged(int)));
+            BT_CONNECT(w, SIGNAL(focusOut(int)), SLOT(keyChooserChanged(int)));
 
             m_layout->addWidget(w);
             w->setProperty(ID_PROPERTY_NAME, i+1);
@@ -208,10 +207,9 @@ void CBookKeyChooser::setModules(const BtConstModuleList & modules,
 /** No descriptions */
 void CBookKeyChooser::adjustFont() {
     //Make sure the entries are displayed correctly.
-    auto const & font =
-        btConfig().getFontForLanguage(*m_modules.first()->language()).second;
-    for (CKeyChooserWidget * const w : m_chooserWidgets)
-        w->comboBox().setFont(font);
+    QListIterator<CKeyChooserWidget *> it(m_chooserWidgets);
+    while (it.hasNext())
+        it.next()->comboBox().setFont(btConfig().getFontForLanguage(*m_modules.first()->language()).second);
 }
 
 /** Refreshes the content. */
@@ -228,8 +226,8 @@ void CBookKeyChooser::setupCombo(const QString & key,
 
     CSwordTreeKey tmpKey(*m_key);
     tmpKey.setKey(key);
-    tmpKey.positionToParent();
-    tmpKey.positionToFirstChild();
+    tmpKey.sword::TreeKeyIdx::parent();
+    tmpKey.firstChild();
 
     QStringList items;
     if (depth > 0)
@@ -237,7 +235,7 @@ void CBookKeyChooser::setupCombo(const QString & key,
 
     do {
         items.append(tmpKey.getLocalNameUnicode());
-    } while (tmpKey.positionToNextSibling());
+    } while (tmpKey.nextSibling());
 
     if (chooserWidget)
         chooserWidget->reset(items, currentItem, false);
@@ -245,7 +243,7 @@ void CBookKeyChooser::setupCombo(const QString & key,
 
 /** A keychooser changed. Update and emit a signal if necessary. */
 void CBookKeyChooser::keyChooserChanged(int newIndex) {
-    Q_UNUSED(newIndex)
+    Q_UNUSED(newIndex);
     QStringList items;
 
     const int max = std::min(m_chooserWidgets.count(),
@@ -272,7 +270,7 @@ void CBookKeyChooser::updateKey(CSwordKey * key) {
     setKey(key, false);
 }
 
-void CBookKeyChooser::handleHistoryMoved(QString const & newKey) {
+void CBookKeyChooser::setKey(const QString & newKey) {
     m_key->setKey(newKey);
     setKey(m_key);
 }

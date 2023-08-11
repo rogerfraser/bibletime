@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -12,57 +12,195 @@
 
 #include "btconfigcore.h"
 
-#ifndef NDEBUG
-#include <QRegExp>
-#endif
-#include <QSettings>
-#include <QScopeGuard>
-#include "../../util/btassert.h"
-#include "../../util/btdebugonly.h"
+#include <cstddef>
+#include <limits>
 
 
-namespace {
+const QString BtConfigCore::GROUP_SESSIONS      = "sessions/";
+const QString BtConfigCore::KEY_CURRENT_SESSION = "sessions/currentSession";
+const QString BtConfigCore::GROUP_SESSION       = "sessions/%1/";
+const QString BtConfigCore::KEY_SESSION_NAME    = "sessions/%1/name";
+const QString BtConfigCore::UI_FONT_SIZE        = "ui/fontSize";
 
-auto groupGuard(QSettings & settings, QString const & group) {
-    settings.beginGroup(group);
-    return qScopeGuard([&settings]() { settings.endGroup(); });
-}
 
-} // anonymous namespace
-
-BtConfigCore::BtConfigCore(std::shared_ptr<QSettings> state,
-                           QString groupPrefix)
-    : m_state(std::move(state))
-    , m_groupPrefix(std::move(groupPrefix))
+BtConfigCore::BtConfigCore(const QString & settingsFile)
+    : m_mutex(QMutex::Recursive)
+    , m_settings(settingsFile, QSettings::IniFormat)
 {
-    BT_DEBUG_ONLY(static QRegExp const groupRegExp("^([^/]+/)*$");)
-    BT_ASSERT(groupRegExp.exactMatch(m_groupPrefix));
+    /**
+      \todo Read UI language from settings, and initialize translator for tr()
+            strings.
+    */
+
+    // Read all session keys and names:
+    m_settings.beginGroup(GROUP_SESSIONS);
+    const QStringList sessionKeys = m_settings.childGroups();
+    m_settings.endGroup();
+    Q_FOREACH (const QString & sessionKey, sessionKeys) {
+        // Skip empty//keys just in case:
+        if (sessionKey.isEmpty())
+            continue;
+
+        const QString fullKey = KEY_SESSION_NAME.arg(sessionKey);
+        const QString sessionName = m_settings.value(fullKey).toString();
+        if (!sessionName.isEmpty())
+            m_sessionNames.insert(sessionKey, sessionName);
+    }
+
+    // Get current session key:
+    m_currentSessionKey = m_settings.value(KEY_CURRENT_SESSION).toString();
+
+    /*
+      If no session with the current session key exists, default to the first
+      session found. If no sessions were found, create a default session.
+    */
+    if (m_currentSessionKey.isEmpty()
+        || !m_sessionNames.contains(m_currentSessionKey))
+    {
+        if (m_sessionNames.isEmpty()) {
+            QString const & newSessionName =
+                    QString::number(static_cast<qulonglong>(0u), 36);
+            m_currentSessionKey = newSessionName;
+            m_settings.setValue(KEY_CURRENT_SESSION, newSessionName);
+            m_settings.setValue(KEY_SESSION_NAME.arg(newSessionName),
+                                tr("Default Session"));
+        } else {
+            m_currentSessionKey = m_sessionNames.keys().first();
+        }
+    }
+    m_cachedCurrentSessionGroup = GROUP_SESSION.arg(m_currentSessionKey);
 }
 
-BtConfigCore::~BtConfigCore() = default;
+void BtConfigCore::setCurrentSession(const QString & key) {
+    BT_ASSERT(!key.isEmpty());
 
-QVariant BtConfigCore::qVariantValue(QString const & key,
-                                     QVariant const & defaultValue) const
-{ return m_state->value(m_groupPrefix + key, defaultValue); }
+    QMutexLocker lock(&m_mutex);
+    BT_ASSERT(m_sessionNames.contains(key));
+    m_currentSessionKey = key;
+    m_cachedCurrentSessionGroup = GROUP_SESSION.arg(key);
 
-QStringList BtConfigCore::childKeys() const {
-    if (m_groupPrefix.isEmpty())
-        return m_state->childKeys();
-    auto const cleanup = groupGuard(*m_state, m_groupPrefix);
-    return m_state->childKeys();
+    m_settings.setValue(KEY_CURRENT_SESSION, key);
+    m_settings.sync();
 }
 
-QStringList BtConfigCore::childGroups() const {
-    if (m_groupPrefix.isEmpty())
-        return m_state->childGroups();
-    auto const cleanup = groupGuard(*m_state, m_groupPrefix);
-    return m_state->childGroups();
+QString BtConfigCore::addSession(const QString & name) {
+    BT_ASSERT(!name.isEmpty());
+
+    // Generate a new session key:
+    QString key = QString::number(0u, 36);
+    QMutexLocker lock(&m_mutex);
+    if (m_sessionNames.contains(key)) {
+        QString keyPrefix;
+        std::size_t i = 1u;
+        for (;;) {
+            key = QString::number(i, 36);
+            if (!m_sessionNames.contains(keyPrefix + key))
+                break;
+            if (i == std::numeric_limits<std::size_t>::max()) {
+                i = 0u;
+                keyPrefix.append('_');
+            } else {
+                i++;
+            }
+        };
+    }
+    BT_ASSERT(!m_sessionNames.contains(key));
+    m_sessionNames.insert(key, name);
+
+    m_settings.setValue(KEY_SESSION_NAME.arg(key), name);
+    m_settings.sync();
+    return key;
 }
 
-void BtConfigCore::remove(QString const & key)
-{ m_state->remove(m_groupPrefix + key); }
 
-void BtConfigCore::sync() { m_state->sync(); }
+void BtConfigCore::deleteSession(const QString & key) {
+    QMutexLocker lock(&m_mutex);
+    BT_ASSERT(m_sessionNames.contains(key));
+    BT_ASSERT(key != m_currentSessionKey);
+    m_sessionNames.remove(key);
 
-void BtConfigCore::setValue_(QString const & key, QVariant value)
-{ m_state->setValue(m_groupPrefix + key, value); }
+    m_settings.remove(GROUP_SESSIONS + key);
+    m_settings.sync();
+}
+
+QStringList BtConfigCore::childKeys() {
+    QMutexLocker lock(&m_mutex);
+    return childKeys__();
+}
+
+QStringList BtConfigCore::childKeys__() {
+    if (m_groups.isEmpty())
+        return m_settings.childKeys();
+
+    m_settings.beginGroup(group());
+    const QStringList gs = m_settings.childKeys();
+    m_settings.endGroup();
+    return gs;
+}
+
+QStringList BtConfigCore::childKeys(const QString & subkey) {
+    beginGroup(subkey);
+    QStringList gs = childKeys__();
+    endGroup();
+    return gs;
+}
+
+QStringList BtConfigCore::childGroups() {
+    QMutexLocker lock(&m_mutex);
+    return childGroups__();
+}
+
+QStringList BtConfigCore::childGroups__() {
+    if (m_groups.isEmpty())
+        return m_settings.childGroups();
+
+    m_settings.beginGroup(group());
+    const QStringList gs = m_settings.childGroups();
+    m_settings.endGroup();
+    return gs;
+}
+
+QStringList BtConfigCore::childGroups(const QString & subkey) {
+    beginGroup(subkey);
+    QStringList gs = childGroups__();
+    endGroup();
+    return gs;
+}
+
+QStringList BtConfigCore::sessionChildGroups() {
+    QMutexLocker lock(&m_mutex);
+    return sessionChildGroups__();
+}
+
+QStringList BtConfigCore::sessionChildGroups__() {
+    QMutexLocker lock(&m_mutex);
+    m_settings.beginGroup(m_cachedCurrentSessionGroup + group());
+    const QStringList gs = m_settings.childGroups();
+    m_settings.endGroup();
+    return gs;
+}
+
+QStringList BtConfigCore::sessionChildGroups(const QString & subkey) {
+    beginGroup(subkey);
+    QStringList gs = sessionChildGroups__();
+    endGroup();
+    return gs;
+}
+
+void BtConfigCore::remove(const QString & key) {
+    QMutexLocker lock(&m_mutex);
+    if (m_groups.isEmpty()) {
+        m_settings.remove(key);
+    } else {
+        m_settings.remove(m_groups.join("/") + '/' + key);
+    }
+}
+
+void BtConfigCore::sessionRemove(const QString & key) {
+    QMutexLocker lock(&m_mutex);
+    if (m_groups.isEmpty()) {
+        m_settings.remove(m_cachedCurrentSessionGroup + key);
+    } else {
+        m_settings.remove(m_cachedCurrentSessionGroup + m_groups.join("/") + '/' + key);
+    }
+}

@@ -1,5 +1,5 @@
-PROJECT(bibletime CXX)
-CMAKE_MINIMUM_REQUIRED(VERSION 3.12)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.10)
+PROJECT(bibletime CXX C)
 
 
 ######################################################
@@ -11,6 +11,7 @@ IF(MSVC) # Automatically link Qt executables to qtmain target on Windows
 ENDIF()
 CMAKE_POLICY(SET CMP0028 NEW)
 
+set(Qt5Core_DIR /usr/lib64/cmake/Qt5Core)
 
 ######################################################
 # Build-time user options:
@@ -115,8 +116,8 @@ LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 # For post-full-release versions, no suffix is used.
 
 SET(BT_VERSION_MAJOR "3")
-SET(BT_VERSION_MINOR "1")
-SET(BT_VERSION_PATCH "0_dev")
+SET(BT_VERSION_MINOR "0")
+SET(BT_VERSION_PATCH "3")
 #SET(BT_VERSION_BUILD "") # Temporarily uncomment this line for release procedures
 
 # Determine build, if needed:

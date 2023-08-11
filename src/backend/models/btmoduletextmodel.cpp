@@ -2,14 +2,13 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
-
 #include <QTextEdit>
 #include "btmoduletextmodel.h"
 
@@ -34,6 +33,8 @@ BtModuleTextModel::BtModuleTextModel(QObject *parent)
       m_firstEntry(0),
       m_maxEntries(0),
       m_textFilter(nullptr) {
+
+    m_findState.enabled = false;
     QHash<int, QByteArray> roleNames;
     roleNames[ModuleEntry::ReferenceRole] =  "keyName";             // reference
     roleNames[ModuleEntry::TextRole] = "line";                      // not used
@@ -136,20 +137,8 @@ QVariant BtModuleTextModel::data(const QModelIndex & index, int role) const {
 
     if ( ! m_highlightWords.isEmpty()) {
         QString t = CSwordModuleSearch::highlightSearchedText(text, m_highlightWords);
-        if (m_findState && index.row() == m_findState->index) {
-            // t = highlightFindPreviousNextField(t); now inlined:
-            int from = 0;
-            for (int i = 0; i < m_findState->subIndex; ++i) {
-                int pos = t.indexOf("\"highlightwords\"", from);
-                if (pos == -1)
-                    return t;
-                else {
-                    from = pos + 1;
-                }
-            }
-            int position = from + 14; // highlightwords = 14, quote was already added
-            t.insert(position, "2");
-        }
+        if (m_findState.enabled && index.row() == m_findState.index)
+            t = highlightFindPreviousNextField(t);
         return QVariant(t);
     }
 
@@ -185,7 +174,7 @@ QString BtModuleTextModel::bookData(const QModelIndex & index, int role) const {
         const CSwordBookModuleInfo *bookModule = qobject_cast<const CSwordBookModuleInfo*>(m_moduleInfoList.at(0));
         CSwordTreeKey key(bookModule->tree(), bookModule);
         int bookIndex = index.row() * 4;
-        key.setOffset(bookIndex);
+        key.setIndex(bookIndex);
         Rendering::CEntryDisplay entryDisplay;
         BtConstModuleList moduleList;
         moduleList << bookModule;
@@ -211,7 +200,7 @@ static int getColumnFromRole(int role) {
 QString BtModuleTextModel::verseData(const QModelIndex & index, int role) const {
     int row = index.row();
     CSwordVerseKey key = indexToVerseKey(row);
-    int verse = key.verse();
+    int verse = key.getVerse();
 
     if (role >= ModuleEntry::TextRole && role <= ModuleEntry::Title9Role) {
         if (verse == 0)
@@ -220,7 +209,7 @@ QString BtModuleTextModel::verseData(const QModelIndex & index, int role) const 
 
         QString chapterTitle;
         if (verse == 1)
-            chapterTitle = key.bookName() + " " + QString::number(key.chapter());
+            chapterTitle = key.book() + " " + QString::number(key.getChapter());
 
         BtConstModuleList modules;
         if ( role == ModuleEntry::TextRole) {
@@ -229,7 +218,7 @@ QString BtModuleTextModel::verseData(const QModelIndex & index, int role) const 
             int column = getColumnFromRole(role);
             CSwordModuleInfo const * module;
             if ((column + 1) > m_moduleInfoList.count())
-                module = m_moduleInfoList.at(0);
+                return "";
             else
                 module = m_moduleInfoList.at(column);
             modules.append(module);
@@ -267,6 +256,22 @@ QString BtModuleTextModel::verseData(const QModelIndex & index, int role) const 
         return text;
     }
     return QString();
+}
+
+QString BtModuleTextModel::highlightFindPreviousNextField(const QString& text) const {
+    QString t = text;
+    int from = 0;
+    for (int i = 0; i < m_findState.subIndex; ++i) {
+        int pos = t.indexOf("\"highlightwords\"", from);
+        if (pos == -1)
+            return t;
+        else {
+            from = pos + 1;
+        }
+    }
+    int position = from + 14; // highlightwords = 14, quote was already added
+    t.insert(position, "2");
+    return t;
 }
 
 int BtModuleTextModel::columnCount(const QModelIndex & /*parent*/) const {
@@ -314,27 +319,30 @@ bool BtModuleTextModel::isLexicon() const {
 }
 
 // Function is valid for Bibles, Commentaries, and Books
-int BtModuleTextModel::keyToIndex(CSwordKey const & key) const {
-    if (auto const * const treeKey = dynamic_cast<CSwordTreeKey const *>(&key))
-        return treeKey->offset() / 4u;
-    if (auto const * const vKey = dynamic_cast<CSwordVerseKey const *>(&key))
-        return vKey->index();
-    return 0;
+int BtModuleTextModel::keyToIndex(const CSwordKey* key) const {
+    int index = 0;
+    const CSwordTreeKey* treeKey = dynamic_cast<const CSwordTreeKey*>(key);
+    if (treeKey) {
+        index = treeKey->getIndex()/4;
+    } else {
+        const CSwordVerseKey* verseKey = dynamic_cast<const CSwordVerseKey*>(key);
+        if (verseKey) {
+            index = verseKey->getIndex();
+        }
+    }
+    return index;
 }
 
 int BtModuleTextModel::verseKeyToIndex(const CSwordVerseKey& key) const {
-    int index = key.index() - m_firstEntry;
+    int index = key.getIndex() - m_firstEntry;
     return index;
 }
 
 CSwordVerseKey BtModuleTextModel::indexToVerseKey(int index) const
-{ return indexToVerseKey(index, *m_moduleInfoList.front()); }
-
-CSwordVerseKey
-BtModuleTextModel::indexToVerseKey(int index,
-                                   CSwordModuleInfo const & module) const
 {
-    CSwordVerseKey key(&module);
+    const CSwordModuleInfo* module = m_moduleInfoList.at(0);
+    CSwordVerseKey key(module);
+
     key.setIntros(true);
     key.setIndex(index + m_firstEntry);
     return key;
@@ -347,7 +355,7 @@ int BtModuleTextModel::indexToVerse(int index) const
 
     key.setIntros(true);
     key.setIndex(index + m_firstEntry);
-    return key.verse();
+    return key.getVerse();
 }
 
 CSwordKey* BtModuleTextModel::indexToKey(int index, int moduleNum) const
@@ -365,7 +373,7 @@ CSwordTreeKey BtModuleTextModel::indexToBookKey(int index) const
     const CSwordBookModuleInfo *bookModule = qobject_cast<const CSwordBookModuleInfo*>(module);
     CSwordTreeKey key(bookModule->tree(), bookModule);
     int bookIndex = index * 4;
-    key.setOffset(bookIndex);
+    key.setIndex(bookIndex);
     return key;
 }
 
@@ -392,17 +400,17 @@ int BtModuleTextModel::getFirstEntryIndex() const {
     return m_firstEntry;
 }
 
-void BtModuleTextModel::setFindState(std::optional<FindState> findState) {
-    if (m_findState && m_findState->index != findState->index) {
-        QModelIndex oldIndexToClear = index(m_findState->index, 0);
-        m_findState = std::move(findState);
-        Q_EMIT dataChanged(oldIndexToClear, oldIndexToClear);
+void BtModuleTextModel::setFindState(const FindState& findState) {
+    if (m_findState.enabled && m_findState.index != findState.index) {
+        QModelIndex oldIndexToClear = index(m_findState.index, 0);
+        m_findState  = findState;
+        emit dataChanged(oldIndexToClear, oldIndexToClear);
     } else {
-        m_findState = std::move(findState);
+        m_findState  = findState;
     }
-    if (m_findState) {
-        QModelIndex index = this->index(m_findState->index, 0);
-        Q_EMIT dataChanged(index, index);
+    if (findState.enabled) {
+        QModelIndex index = this->index(findState.index, 0);
+        emit dataChanged(index, index);
     }
 }
 void BtModuleTextModel::setHighlightWords(
@@ -437,9 +445,12 @@ bool BtModuleTextModel::setData(
         const QModelIndex &index,
         const QVariant &value,
         int role) {
-    auto const & module = *m_moduleInfoList.at(getColumnFromRole(role));
-    CSwordVerseKey mKey(indexToVerseKey(index.row(), module));
-    const_cast<CSwordModuleInfo &>(module).write(&mKey, value.toString());
-    Q_EMIT dataChanged(index, index);
+    CSwordVerseKey key = indexToVerseKey(index.row());
+    int column = getColumnFromRole(role);
+    const CSwordModuleInfo* module = m_moduleInfoList.at(column);
+    CSwordVerseKey mKey(module);
+    mKey.setKey(key);
+    const_cast<CSwordModuleInfo*>(module)->write(&mKey, value.toString());
+    emit dataChanged(index, index);
     return true;
 }

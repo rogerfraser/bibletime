@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTMODULEINDEXDIALOG_H
+#define BTMODULEINDEXDIALOG_H
 
 #include <QProgressDialog>
 
@@ -52,6 +53,12 @@ class BtModuleIndexDialog: public QProgressDialog {
         */
         bool indexAllModulesPrivate(const QList<CSwordModuleInfo*> &modules);
 
+    private slots:
+        void slotModuleProgress(int percentage);
+        void slotFinished();
+
     private: /* Fields: */
         int m_currentModuleIndex;
 };
+
+#endif

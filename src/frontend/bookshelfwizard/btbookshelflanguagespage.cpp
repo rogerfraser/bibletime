@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -20,17 +20,11 @@
 #include <set>
 #include "../../backend/btinstallbackend.h"
 #include "../../backend/config/btconfig.h"
-#include "../../backend/language.h"
+#include "../../backend/managers/clanguagemgr.h"
 #include "../../backend/models/btlistmodel.h"
 #include "../../util/btconnect.h"
 #include "btbookshelfwizard.h"
 #include "btbookshelfwizardenums.h"
-
-// Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
-#include <installmgr.h>
-#pragma GCC diagnostic pop
 
 
 namespace {
@@ -98,13 +92,11 @@ void BtBookshelfLanguagesPage::initializePage() {
 void BtBookshelfLanguagesPage::initializeLanguages() {
     // Get languages from sources:
     std::set<QString> languages;
-    for (auto const & sourceName : btWizard().selectedSources()) {
-        std::shared_ptr<CSwordBackend const> const backend(
-                    BtInstallBackend::backend(
-                        BtInstallBackend::source(sourceName)));
-        for (auto const * module : backend->moduleList())
+    for (auto const & sourceName : btWizard().selectedSources())
+        for (auto const * module :
+             BtInstallBackend::backend(
+                 BtInstallBackend::source(sourceName))->moduleList())
             languages.insert(module->language()->translatedName());
-    }
 
     // Update languages model:
     m_model->clear();
@@ -117,7 +109,7 @@ void BtBookshelfLanguagesPage::initializeLanguages() {
 bool BtBookshelfLanguagesPage::skipPage() const noexcept
 { return m_model->rowCount() == 1; }
 
-void BtBookshelfLanguagesPage::slotDataChanged() { Q_EMIT completeChanged(); }
+void BtBookshelfLanguagesPage::slotDataChanged() { emit completeChanged(); }
 
 bool BtBookshelfLanguagesPage::isComplete() const
 { return selectedLanguages().count() > 0; }

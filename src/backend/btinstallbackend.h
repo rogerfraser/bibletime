@@ -2,23 +2,24 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef INSTBACKEND_H
+#define INSTBACKEND_H
 
-#include <memory>
 #include <QDir>
 #include <QString>
 #include "managers/cswordbackend.h"
 
+// Sword includes:
+#include <installmgr.h>
 
-namespace sword { class InstallSource; }
 
 class CSwordModuleInfo;
 
@@ -32,6 +33,9 @@ sword::InstallSource source(const QString &name);
 
 /** Deletes the source. */
 bool deleteSource(const QString &name);
+
+/** Returns the moduleinfo list for the source. */
+QList<CSwordModuleInfo*> moduleList(const QString &name);
 
 /** Tells if the source is remote or local. */
 bool isRemote(const sword::InstallSource& source);
@@ -63,6 +67,8 @@ QString swordConfigFilename();
 QDir swordDir();
 
 /** Returns backend Sword manager for the source. */
-std::unique_ptr<CSwordBackend> backend(sword::InstallSource const & is);
+CSwordBackend * backend(const sword::InstallSource & is);
 
 } // namespace BtInstallBackend
+
+#endif

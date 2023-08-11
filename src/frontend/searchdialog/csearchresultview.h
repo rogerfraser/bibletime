@@ -2,19 +2,21 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CSEARCHRESULTSVIEW_H
+#define CSEARCHRESULTSVIEW_H
 
 #include <QTreeWidget>
 
-#include "../../backend/cswordmodulesearch.h"
+// Sword includes
+#include <listkey.h>
 
 
 class CSwordModuleInfo;
@@ -32,7 +34,9 @@ class CSearchResultView  : public QTreeWidget {
         /**
           \returns the module which is currently used.
         */
-        CSwordModuleInfo const * module() const { return m_module; }
+        inline const CSwordModuleInfo *module() const {
+            return m_module;
+        }
 
     protected: // Protected methods
         /**
@@ -45,17 +49,29 @@ class CSearchResultView  : public QTreeWidget {
         QMimeData * mimeData ( const QList<QTreeWidgetItem *> items ) const override;
         QStringList mimeTypes () const override;
 
-    public Q_SLOTS: // Public slots
+    public slots: // Public slots
+        void saveItems();
 
         /**
           Setups the list with the given module.
         */
-        void setupTree(CSwordModuleInfo const * m,
-                       CSwordModuleSearch::ModuleResultList const & results);
+        void setupTree(const CSwordModuleInfo *m, const sword::ListKey &results);
 
         void setupStrongsTree(CSwordModuleInfo*, const QStringList&);
+        void pipeItemsWithText();
+        void copyItemsWithText();
+        void copyItems();
+        void saveItemsWithText();
 
         void contextMenuEvent(QContextMenuEvent* event) override;
+
+    protected slots: // Protected slots
+        void printItems();
+
+        /**
+        * Is connected to the signal which is emitted when a new item was chosen.
+        */
+        void executed(QTreeWidgetItem* current, QTreeWidgetItem*);
 
     private:
         struct {
@@ -86,9 +102,12 @@ class CSearchResultView  : public QTreeWidget {
         QMenu* m_popup;
         const CSwordModuleInfo *m_module;
 
-    Q_SIGNALS: // Signals
+    signals: // Signals
         void keySelected(const QString&);
         void keyDeselected();
 };
 
 } //end of namespace Search
+
+#endif
+

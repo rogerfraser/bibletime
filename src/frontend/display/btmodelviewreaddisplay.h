@@ -2,27 +2,28 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTMODELVIEWREADDISPLAY_H
+#define BTMODELVIEWREADDISPLAY_H
 
 #include <QWidget>
-
-#include <QString>
-#include "../../backend/btglobal.h"
+#include "creaddisplay.h"
 #include "modelview/btqmlscrollview.h"
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QPoint>
+#include <QTimerEvent>
 
 
 class BtQmlScrollView;
 class BtQmlInterface;
-class CDisplayWindow;
-class QMenu;
 
 /**
   * @page modelviewmain Details about the model/view read display
@@ -59,155 +60,112 @@ class QMenu;
 
 /** The view implementation for the Model/View read display.
   */
-class BtModelViewReadDisplay : public QWidget {
+class BtModelViewReadDisplay : public QWidget, public CReadDisplay {
     Q_OBJECT
 
-public: /* Types: */
+public:
 
-    enum TextType {
-        HTMLText, /* Used for HTML markup */
-        PlainText /* Plain text without links etc. */
-    };
-
-    enum TextPart {
-        Document, /* All text */
-        SelectedText, /* Only the selected text */
-        AnchorOnly,
-        AnchorTextOnly,
-        AnchorWithText
-    };
-
-public: /* Methods: */
-
-    BtModelViewReadDisplay(CDisplayWindow * displayWindow,
-                           QWidget * parent = nullptr);
+    BtModelViewReadDisplay( CReadWindow* readWindow, QWidget* parent = nullptr );
 
     ~BtModelViewReadDisplay() override;
 
-    /**
-        \brief Copies the given text with the specified format into the
-               applications clipboard.
-    */
-    bool copy(TextType const format, TextPart const part);
+    // ---------------------------
+    //reimplemented functions from CDisplay
+    // Returns the right text part in the specified format.
+    const QString text(const CDisplay::TextType format = CDisplay::HTMLText,
+                       const CDisplay::TextPart part = CDisplay::Document)
+    override;
 
-    bool pipe(TextType const format, TextPart const part);
+    void reloadModules() override;
 
-    void copyAnchorOnly() { copy(PlainText, AnchorOnly); }
-    void copyAnchorTextOnly() { copy(PlainText, AnchorTextOnly); }
-    void copyAnchorWithText() { copy(PlainText, AnchorWithText); }
-    void pipeAnchorWithText() { pipe(PlainText, AnchorWithText); }
-    void saveAnchorWithText() { save(PlainText, AnchorWithText); }
-    void copyAll() { copy(PlainText, Document); }
+    void setDisplayFocus() override;
 
-    /** \brief Copies the currently selected text. */
-    void copySelectedText();
+    void setDisplayOptions(const DisplayOptions &displayOptions) override;
 
-    /**
-        \brief Copies the given text specified by asking user for first and last
-               references.
-    */
-    void copyByReferences();
+    void setText( const QString& newText ) override;
 
-    /**
-        \brief Saves the given text with the specified format into the
-               applications clipboard.
-    */
-    bool save(TextType const format, TextPart const part);
+    bool hasSelection() const override;
 
-    void print(TextPart const,
-               DisplayOptions const & displayOptions,
-               FilterOptions const & filterOptions);
+    QWidget* view() override;
 
-    void printAll(DisplayOptions const & displayOptions,
-                  FilterOptions const & filterOptions)
-    { print(Document, displayOptions, filterOptions); }
-
-    void printAnchorWithText(DisplayOptions const & displayOptions,
-                             FilterOptions const & filterOptions)
-    { print(AnchorWithText, displayOptions, filterOptions); }
-
-    /**
-        \brief Installs the popup which should be opened when the right mouse
-               button was pressed.
-    */
-    void installPopup(QMenu * const popup) { m_popup = popup; }
-
-    /** \returns the popup menu which was set by installPopupMenu() */
-    QMenu * installedPopup() { return m_popup; }
-
-    /**
-       \param[in] format The format to use for the text.
-       \param[in] part The part of the text to return.
-       \returns the right text part in the specified format.
-    */
-    QString text(TextType const format = HTMLText,
-                 TextPart const part = Document);
-
-    void reloadModules();
-
-    void setDisplayFocus();
-
-    void setDisplayOptions(const DisplayOptions &displayOptions);
-
-    /** \returns the view of this display widget. */
-    QWidget * view() { return m_widget; }
+    void selectAll() override;
 
     // --------------------
 
-    void contextMenu(QContextMenuEvent * event);
+    void contextMenu(QContextMenuEvent* event) override;
 
-    QString getCurrentSource() { return m_currentSource; }
+    QString getCurrentSource();
 
-    void highlightText(const QString& text, bool caseSensitive);
+    void highlightText(const QString& text, bool caseSensitive) override;
 
-    void findText(const QString& text, bool caseSensitive, bool backward);
+    void findText(const QString& text, bool caseSensitive, bool backward) override;
 
-    void openFindTextDialog();
-    QString getCurrentNodeInfo() const { return m_nodeInfo; }
+    void moveToAnchor( const QString& anchor ) override;
+
+    void openFindTextDialog() override;
+    inline QString getCurrentNodeInfo() const override {
+        return m_nodeInfo;
+    }
 
     void pageDown();
 
     void pageUp();
 
-    void scrollToKey(CSwordKey * key);
+    void scrollToKey(CSwordKey * key) override;
 
-    void scroll(int pixels);
+    void scroll(int pixels) override;
 
-    void setFilterOptions(FilterOptions filterOptions);
+    void setFilterOptions(FilterOptions filterOptions) override;
 
     void setLemma(const QString& lemma);
 
-    void setModules(QStringList const & modules);
+    void setModules(const QStringList& modules) override;
 
     void settingsChanged();
 
-    void updateReferenceText();
+    void updateReferenceText() override;
 
-    BtQuickWidget * quickWidget() { return m_widget->quickWidget(); }
-
-    BtQuickWidget const * quickWidget() const
-    { return m_widget->quickWidget(); }
+    BtQuickWidget* quickWidget() {
+        return m_widget->quickWidget();
+    }
 
     BtQmlInterface * qmlInterface() const;
 
-    /** \returns whether the display has an active anchor. */
-    bool hasActiveAnchor() const { return !m_activeAnchor.isEmpty(); }
 
-Q_SIGNALS:
+signals:
     void completed();
 
-private: /* Fields: */
+protected:
 
-    CDisplayWindow* m_parentWindow;
-    QMenu* m_popup;
-    QString m_activeAnchor; //< Holds the current anchor
+    void slotGoToAnchor(const QString& anchor);
+    struct DNDData {
+        bool mousePressed;
+        bool isDragging;
+        QString selection;
+        QPoint startPos;
+        enum DragType {
+            Link,
+            Text
+        } dragType;
+    }
+    m_dndData;
 
-    QString m_currentSource;
+    QString currentSource;
 
     QString m_nodeInfo;
     int m_magTimerId;
+
+private slots:
+    void slotDelayedMoveToAnchor();
+    void slotUpdateReference(const QString& reference);
+    void slotDragOccuring(const QString& moduleName, const QString& keyName);
+    void slotReferenceDropped(const QString& reference);
+
+private:
 
     BtQmlScrollView* m_widget;
     QString m_currentAnchorCache;
 
 };
+
+#endif

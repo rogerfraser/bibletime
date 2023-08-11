@@ -2,20 +2,22 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CSWORDGENBOOKMODULEINFO_H
+#define CSWORDGENBOOKMODULEINFO_H
 
 #include "cswordmoduleinfo.h"
 
+// Sword includes:
+#include <treekeyidx.h>
 
-namespace sword { class TreeKeyIdx; }
 
 /**
   \brief Class for generic book support
@@ -34,7 +36,7 @@ class CSwordBookModuleInfo: public CSwordModuleInfo {
         /**
           \returns the maximal depth of sections and subsections.
         */
-        int depth() const { return m_depth; }
+        inline int depth() const { return m_depth; }
 
         /**
           \returns A treekey filled with the structure of this module. Don't
@@ -53,3 +55,5 @@ class CSwordBookModuleInfo: public CSwordModuleInfo {
     private: /* Fields: */
         int m_depth;
 };
+
+#endif

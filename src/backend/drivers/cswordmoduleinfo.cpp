@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -14,22 +14,24 @@
 
 #include <memory>
 #include <cassert>
+#ifndef BT_NO_LUCENE
 #include <CLucene.h>
+#endif
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
 #include <QLocale>
-#include <QScopeGuard>
 #include <QSettings>
 #include <QTextDocument>
 #include "../../util/btassert.h"
+#include "../../util/btscopeexit.h"
 #include "../../util/cresmgr.h"
 #include "../../util/directory.h"
-#include "../../util/tool.h"
 #include "../config/btconfig.h"
 #include "../keys/cswordkey.h"
+#include "../managers/clanguagemgr.h"
 #include "../managers/cswordbackend.h"
 #include "../rendering/centrydisplay.h"
 #include "../cswordmodulesearch.h"
@@ -37,18 +39,12 @@
 #include "cswordlexiconmoduleinfo.h"
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <listkey.h>
 #include <swbuf.h>
 #include <swconfig.h>
 #include <swkey.h>
-#include <swmodule.h>
-#include <swversion.h>
 #include <rtfhtml.h>
 #include <versekey.h>
-#pragma GCC diagnostic pop
 
 
 //Increment this, if the index format changes
@@ -110,18 +106,12 @@ CSwordModuleInfo::CSwordModuleInfo(sword::SWModule & module,
     , m_cachedName(QString::fromUtf8(module.getName()))
     , m_cachedCategory(retrieveCategory(type, module))
     , m_cachedLanguage(
-        Language::fromAbbrev(
-              util::tool::fixSwordBcp47(
-                  m_cachedCategory == Glossary
-                  /* Special handling for glossaries, we use the "from language" as
-                     language for the module: */
-                  ? config(GlossaryFrom)
-                  : module.getLanguage())))
-    , m_cachedGlossaryTargetLanguage(
-        m_cachedCategory == Glossary
-        ? Language::fromAbbrev(
-              util::tool::fixSwordBcp47(module.getLanguage()))
-        : std::shared_ptr<Language const>())
+        CLanguageMgr::instance()->languageForAbbrev(
+            m_cachedCategory == Glossary
+            /* Special handling for glossaries, we use the "from language" as
+               language for the module: */
+            ? config(GlossaryFrom)
+            : module.getLanguage()))
     , m_cachedHasVersion(!QString((*m_backend.getConfig())[module.getName()]["Version"]).isEmpty())
 {
     m_hidden = btConfig().value<QStringList>("state/hiddenModules",
@@ -152,13 +142,12 @@ bool CSwordModuleInfo::unlock(const QString & unlockKey) {
        backend->setCipherKey() does not work correctly for modules from which
        data was already fetched. Therefore we have to reload the modules in
        bibletime.cpp */
-    m_backend.raw().setCipherKey(m_module.getName(),
-                                 unlockKey.toUtf8().constData());
+    m_backend.setCipherKey(m_module.getName(), unlockKey.toUtf8().constData());
 
     /// \todo write to Sword config as well
 
     if (unlockKeyIsValid() != unlocked)
-        Q_EMIT unlockedChanged(!unlocked);
+        emit unlockedChanged(!unlocked);
     return true;
 }
 
@@ -229,6 +218,9 @@ QString CSwordModuleInfo::getModuleStandardIndexLocation() const {
 }
 
 bool CSwordModuleInfo::hasIndex() const {
+#ifdef BT_NO_LUCENE
+    return false;
+#else
     { // Is this a directory?
         QFileInfo fi(getModuleStandardIndexLocation());
         if (!fi.isDir())
@@ -257,6 +249,7 @@ bool CSwordModuleInfo::hasIndex() const {
     // Is the index there?
     return lucene::index::IndexReader::indexExists(getModuleStandardIndexLocation()
                                                    .toLatin1().constData());
+#endif
 }
 
 bool CSwordModuleInfo::hasImportantFilterOption() const {
@@ -278,12 +271,10 @@ inline void CSwordModuleInfo::setImportantFilterOptions(bool enable) {
 }
 
 void CSwordModuleInfo::buildIndex() {
-    auto cleanup =
-            qScopeGuard(
-                [this]() noexcept
-                { m_cancelIndexing.store(false, std::memory_order_relaxed); });
+    BT_SCOPE_EXIT(m_cancelIndexing.store(false, std::memory_order_relaxed););
 #define CANCEL_INDEXING (m_cancelIndexing.load(std::memory_order_relaxed))
 
+#ifndef BT_NO_LUCENE
     try {
         // Without this we don't get strongs, lemmas, etc.
         m_backend.setFilterOptions(btConfig().getFilterOptions());
@@ -317,6 +308,9 @@ void CSwordModuleInfo::buildIndex() {
         std::unique_ptr<IW> writer(new IW(index.toLatin1().constData(), &an, true));
         writer->setMaxFieldLength(BT_MAX_LUCENE_FIELD_LENGTH);
         writer->setUseCompoundFile(true); // Merge segments into a single file
+#ifndef CLUCENE2
+        writer->setMinMergeDocs(1000);
+#endif
 
         CSwordBibleModuleInfo *bm = qobject_cast<CSwordBibleModuleInfo*>(this);
 
@@ -325,8 +319,8 @@ void CSwordModuleInfo::buildIndex() {
 
         if(bm)
         {
-            verseLowIndex = bm->lowerBound().index();
-            verseHighIndex = bm->upperBound().index();
+            verseLowIndex = bm->lowerBound().getIndex();
+            verseHighIndex = bm->upperBound().getIndex();
         }
         else
         {
@@ -347,7 +341,7 @@ void CSwordModuleInfo::buildIndex() {
             verseSpan = static_cast<CSwordLexiconModuleInfo *>(this)->entries().size();
         }
 
-        Q_EMIT indexingProgress(0);
+        emit indexingProgress(0);
 
         sword::SWKey * const key = m_module.getKey();
         sword::VerseKey * const vk = dynamic_cast<sword::VerseKey *>(key);
@@ -373,7 +367,7 @@ void CSwordModuleInfo::buildIndex() {
         BT_ASSERT(wcharBuffer);
 
         if(bm && vk) // Implied that vk could be null due to cast above
-            vk->setIndex(bm->lowerBound().index());
+            vk->setIndex(bm->lowerBound().getIndex());
         else
             m_module.setPosition(sword::TOP);
 
@@ -424,8 +418,14 @@ void CSwordModuleInfo::buildIndex() {
                                                    | lucene::document::Field::INDEX_TOKENIZED)));
             textBuffer.clear();
 
-            for (auto & vp : m_module.getEntryAttributes()["Footnote"]) {
-                lucene_utf8towcs(wcharBuffer, vp.second["body"], BT_MAX_LUCENE_FIELD_LENGTH);
+            using ALI = sword::AttributeList::iterator;
+            using AVI = sword::AttributeValue::iterator;
+
+            for (ALI it = m_module.getEntryAttributes()["Footnote"].begin();
+                 it != m_module.getEntryAttributes()["Footnote"].end();
+                 ++it)
+            {
+                lucene_utf8towcs(wcharBuffer, it->second["body"], BT_MAX_LUCENE_FIELD_LENGTH);
                 doc->add(*(new lucene::document::Field(static_cast<const TCHAR *>(_T("footnote")),
                                                        static_cast<const TCHAR *>(wcharBuffer),
                                                        lucene::document::Field::STORE_NO
@@ -433,10 +433,11 @@ void CSwordModuleInfo::buildIndex() {
             }
 
             // Headings
-            for (auto & vp
-                 : m_module.getEntryAttributes()["Heading"]["Preverse"])
+            for (AVI it = m_module.getEntryAttributes()["Heading"]["Preverse"].begin();
+                 it != m_module.getEntryAttributes()["Heading"]["Preverse"].end();
+                 ++it)
             {
-                lucene_utf8towcs(wcharBuffer, vp.second, BT_MAX_LUCENE_FIELD_LENGTH);
+                lucene_utf8towcs(wcharBuffer, it->second, BT_MAX_LUCENE_FIELD_LENGTH);
                 doc->add(*(new lucene::document::Field(static_cast<const TCHAR *>(_T("heading")),
                                                        static_cast<const TCHAR *>(wcharBuffer),
                                                        lucene::document::Field::STORE_NO
@@ -487,9 +488,9 @@ void CSwordModuleInfo::buildIndex() {
 
             if (verseIndex % 200 == 0) {
                 if (verseSpan == 0) { // Prevent division by zero
-                    Q_EMIT indexingProgress(0);
+                    emit indexingProgress(0);
                 } else {
-                    Q_EMIT indexingProgress(
+                    emit indexingProgress(
                             static_cast<int>(
                                     (100 * (verseIndex - verseLowIndex))
                                     / verseSpan));
@@ -514,18 +515,21 @@ void CSwordModuleInfo::buildIndex() {
                 module_config.setValue("module-version",
                                        config(CSwordModuleInfo::ModuleVersion));
             module_config.setValue("index-version", INDEX_VERSION);
-            Q_EMIT hasIndexChanged(true);
+            emit hasIndexChanged(true);
         }
     // } catch (CLuceneError & e) {
     } catch (...) {
         deleteIndex();
         throw;
     }
+#else
+    return false;
+#endif
 }
 
 void CSwordModuleInfo::deleteIndex() {
     deleteIndexForModule(m_cachedName);
-    Q_EMIT hasIndexChanged(false);
+    emit hasIndexChanged(false);
 }
 
 void CSwordModuleInfo::deleteIndexForModule(const QString & name) {
@@ -537,9 +541,9 @@ size_t CSwordModuleInfo::indexSize() const {
     return DU::getDirSizeRecursive(getModuleBaseIndexLocation());
 }
 
-CSwordModuleSearch::ModuleResultList
-CSwordModuleInfo::searchIndexed(QString const & searchedText,
-                                sword::ListKey const & scope) const
+size_t CSwordModuleInfo::searchIndexed(const QString & searchedText,
+                                       const sword::ListKey & scope,
+                                       sword::ListKey & results) const
 {
     std::unique_ptr<char[]> sPutfBuffer(
             new char[BT_MAX_LUCENE_FIELD_LENGTH  + 1]);
@@ -551,8 +555,17 @@ CSwordModuleInfo::searchIndexed(QString const & searchedText,
     BT_ASSERT(wcharBuffer);
 
     // work around Swords thread insafety for Bibles and Commentaries
-    m_module.setKey(CSwordKey::createInstance(this)->asSwordKey());
+    {
+        std::unique_ptr<CSwordKey> key(CSwordKey::createInstance(this));
+        const sword::SWKey * const s = dynamic_cast<sword::SWKey *>(key.get());
+        if (s)
+            m_module.setKey(*s);
+    }
+    QList<sword::VerseKey *> list;
 
+    results.clear();
+
+#ifndef BT_NO_LUCENE
     // do not use any stop words
     static const TCHAR * stop_words[1u]  = { nullptr };
     lucene::analysis::standard::StandardAnalyzer analyzer(stop_words);
@@ -562,8 +575,12 @@ CSwordModuleInfo::searchIndexed(QString const & searchedText,
                                                                                      static_cast<const TCHAR *>(_T("content")),
                                                                                      &analyzer));
 
-    std::unique_ptr<lucene::search::Hits> h(
-                searcher.search(q.get(), lucene::search::Sort::INDEXORDER()));
+    std::unique_ptr<lucene::search::Hits> h(searcher.search(q.get(),
+                                                           #ifdef CLUCENE2
+                                                           lucene::search::Sort::INDEXORDER()));
+                                                           #else
+                                                           lucene::search::Sort::INDEXORDER));
+                                                           #endif
 
     const bool useScope = (scope.getCount() > 0);
 
@@ -574,8 +591,11 @@ CSwordModuleInfo::searchIndexed(QString const & searchedText,
     if (vk)
         vk->setIntros(true);
 
-    CSwordModuleSearch::ModuleResultList results;
+#ifdef CLUCENE2
     for (size_t i = 0; i < h->length(); ++i) {
+#else
+    for (int i = 0; i < h->length(); ++i) {
+#endif
         doc = &h->doc(i);
         lucene_wcstoutf8(utfBuffer,
                          static_cast<const wchar_t *>(doc->get(static_cast<const TCHAR *>(_T("key")))),
@@ -592,15 +612,19 @@ CSwordModuleInfo::searchIndexed(QString const & searchedText,
                 if (vkey->getLowerBound().compare(*swKey) <= 0
                     && vkey->getUpperBound().compare(*swKey) >= 0)
                 {
-                    results.emplace_back(swKey->clone());
+                    results.add(*swKey);
                 }
             }
-        } else { // No scope, give me all buffers
-            results.emplace_back(swKey->clone());
+        } else {
+            results.add(*swKey); // No scope, give me all buffers
         }
     }
+#endif
 
-    return results;
+    qDeleteAll(list);
+    list.clear();
+
+    return static_cast<size_t>(results.getCount());
 }
 
 sword::SWVersion CSwordModuleInfo::minimumSwordVersion() const {
@@ -894,9 +918,6 @@ QString CSwordModuleInfo::aboutText() const {
     return text;
 }
 
-bool CSwordModuleInfo::isUnicode() const noexcept
-{ return m_module.isUnicode(); }
-
 QIcon const & CSwordModuleInfo::moduleIcon(const CSwordModuleInfo & module) {
     CSwordModuleInfo::Category const cat(module.m_cachedCategory);
     switch (cat) {
@@ -1040,6 +1061,6 @@ bool CSwordModuleInfo::setHidden(bool hide) {
         hiddenModules.removeOne(m_cachedName);
     }
     btConfig().setValue("state/hiddenModules", hiddenModules);
-    Q_EMIT hiddenChanged(hide);
+    emit hiddenChanged(hide);
     return true;
 }

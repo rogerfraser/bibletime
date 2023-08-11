@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTSOURCESTHREAD_H
+#define BTSOURCESTHREAD_H
 
 #include <QThread>
 
@@ -23,7 +24,7 @@ class BtSourcesThread: public QThread {
 
 public: /* Methods: */
 
-    BtSourcesThread(QObject * parent = nullptr)
+    inline BtSourcesThread(QObject * parent = nullptr)
         : QThread(parent)
         , m_stop(false)
         , m_finishedSuccessfully(false)
@@ -31,10 +32,10 @@ public: /* Methods: */
 
     void stop() noexcept { m_stop.store(true, std::memory_order_release); }
 
-    bool finishedSuccessfully() const noexcept
+    inline bool finishedSuccessfully() const noexcept
     { return m_finishedSuccessfully.load(std::memory_order_acquire); }
 
-Q_SIGNALS:
+signals:
 
     void percentComplete(int percent);
     void showMessage(QString const & msg);
@@ -45,7 +46,7 @@ protected: /* Methods: */
 
 private: /* Methods: */
 
-    bool shouldStop() const noexcept
+    inline bool shouldStop() const noexcept
     { return m_stop.load(std::memory_order_acquire); }
 
 private: /* Fields: */
@@ -54,3 +55,5 @@ private: /* Fields: */
     std::atomic<bool> m_finishedSuccessfully;
 
 }; /* class BtSourcesThread */
+
+#endif

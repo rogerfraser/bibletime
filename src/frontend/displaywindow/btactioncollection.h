@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BT_ACTION_COLLECTION_H
+#define BT_ACTION_COLLECTION_H
 
 #include <QObject>
 
@@ -48,25 +49,29 @@ private: /* Types: */
 
 public: /* Methods: */
 
-    BtActionCollection(QObject * const parent = nullptr)
+    inline BtActionCollection(QObject * const parent = nullptr)
             : QObject{parent}
     {}
 
     void addAction(QString const & name, QAction * const action);
+
+    void addAction(QString const & name,
+                   QObject const * const receiver,
+                   const char * const member = nullptr);
 
     void removeAction(QString const & name);
 
     QAction & action(QString const & name) const;
 
     template <typename T>
-    T & actionAs(QString const & name) const {
+    inline T & actionAs(QString const & name) const {
         QAction & a = action(name);
         BT_ASSERT(dynamic_cast<T *>(&a));
         return static_cast<T &>(a);
     }
 
     template <typename F>
-    void foreachQAction(F && f) const {
+    inline void foreachQAction(F && f) const {
         for (Item const * const item : m_actions)
             f(*(item->m_action), item->m_defaultKeys);
     }
@@ -103,3 +108,5 @@ private: /* Fields: */
     ActionMap m_actions;
 
 };
+
+#endif

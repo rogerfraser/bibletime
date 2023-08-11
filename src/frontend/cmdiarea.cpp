@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -25,8 +25,7 @@
 #include "../util/btconnect.h"
 #include "bibletime.h"
 #include "displaywindow/btmodulechooserbar.h"
-#include "displaywindow/cdisplaywindow.h"
-#include "display/btmodelviewreaddisplay.h"
+#include "display/cdisplay.h"
 
 
 namespace {
@@ -57,29 +56,14 @@ CMDIArea::CMDIArea(BibleTime * parent)
     setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 
-    BT_CONNECT(this, &QMdiArea::subWindowActivated,
-               [this](QMdiSubWindow* client) {
-                   if (subWindowList().isEmpty())
-                       m_bibleTime->clearMdiToolBars();
-
-                   if (client == nullptr) {
-                       return;
-                   }
-                   Q_EMIT sigSetToplevelCaption( client->windowTitle().trimmed() );
-
-                   // Notify child window it is active
-                   CDisplayWindow* const activeWindow = getDisplayWindow(client);
-                   if (activeWindow != nullptr && activeWindow != m_activeWindow) {
-                       m_activeWindow = activeWindow;
-                       activeWindow->windowActivated();
-                   }
-               });
+    BT_CONNECT(this, SIGNAL(subWindowActivated(QMdiSubWindow *)),
+               this, SLOT(slotSubWindowActivated(QMdiSubWindow *)));
 }
 
 void CMDIArea::fixSystemMenu(QMdiSubWindow* subWindow) {
     // Change Qt QMdiSubWindow Close action to have no shortcuts
     // This makes our closeWindow actions with Ctrl-W work correctly
-    for (auto * const action : subWindow->systemMenu()->actions()) {
+    Q_FOREACH(QAction * const action, subWindow->systemMenu()->actions()) {
         if (action->text().contains("Close")) {
             action->setShortcuts(QList<QKeySequence>());
             break;
@@ -146,7 +130,7 @@ void CMDIArea::setMDIArrangementMode( const MDIArrangementMode newArrangementMod
             triggerWindowUpdate();
             break;
     }
-    for (auto * const tab : findChildren<QTabBar *>()) {
+    Q_FOREACH(QTabBar * const tab, findChildren<QTabBar *>()) {
         QObject* parent = tab->parent();
         if (parent == this)
             tab->setTabsClosable(true);
@@ -177,7 +161,7 @@ void CMDIArea::myTileVertical() {
 
     const int widthForEach = width() / windows.count();
     int x = 0;
-    for (auto * const window : windows) {
+    Q_FOREACH (QMdiSubWindow * const window, windows) {
         window->showNormal();
 
         const int preferredWidth = window->minimumWidth() + window->baseSize().width();
@@ -210,7 +194,7 @@ void CMDIArea::myTileHorizontal() {
 
     const int heightForEach = height() / windows.count();
     int y = 0;
-    for (auto * const window : windows) {
+    Q_FOREACH (QMdiSubWindow * const window, windows) {
         window->showNormal();
 
         const int preferredHeight = window->minimumHeight() + window->baseSize().height();
@@ -309,7 +293,7 @@ void CMDIArea::myCascade() {
         unsigned int x = 0;
         unsigned int y = 0;
 
-        for (auto * const window : windows) {
+        Q_FOREACH (QMdiSubWindow * const window, windows) {
             if (window == active) { //leave out the active window which should be the top window
                 continue;
             }
@@ -332,10 +316,10 @@ void CMDIArea::myCascade() {
 
 void CMDIArea::emitWindowCaptionChanged() {
     if (activeSubWindow()) {
-        Q_EMIT sigSetToplevelCaption(activeSubWindow()->windowTitle());
+        emit sigSetToplevelCaption(activeSubWindow()->windowTitle());
     }
     else {
-        Q_EMIT sigSetToplevelCaption(QString());
+        emit sigSetToplevelCaption(QString());
     }
 }
 
@@ -343,10 +327,27 @@ QList<QMdiSubWindow*> CMDIArea::usableWindowList() const {
     //Take care: when new windows are added, they will not appear
     //in subWindowList() when their ChildAdded-Event is triggered
     QList<QMdiSubWindow*> ret;
-    for (auto * const w : subWindowList())
+    Q_FOREACH(QMdiSubWindow * const w, subWindowList())
         if (!w->isHidden())
             ret.append(w);
     return ret;
+}
+
+void CMDIArea::slotSubWindowActivated(QMdiSubWindow* client) {
+    if (subWindowList().isEmpty())
+        m_bibleTime->clearMdiToolBars();
+
+    if (client == nullptr) {
+        return;
+    }
+    emit sigSetToplevelCaption( client->windowTitle().trimmed() );
+
+    // Notify child window it is active
+    CDisplayWindow* const activeWindow = getDisplayWindow(client);
+    if (activeWindow != nullptr && activeWindow != m_activeWindow) {
+        m_activeWindow = activeWindow;
+        activeWindow->windowActivated();
+    }
 }
 
 void CMDIArea::findNextTextInActiveWindow(QString const & text, bool cs)
@@ -401,7 +402,7 @@ bool CMDIArea::eventFilter(QObject *o, QEvent *e) {
             /*
               Do not handle window activation or deactivation here, it will
               produce wrong results because this event is handled too early. Let
-              lambda connected to subWindowActivated() handle this.
+              slotSubWindowActivated() handle this.
             */
 
             // Check if subwindow was maximized or un-maximized:
@@ -421,7 +422,7 @@ bool CMDIArea::eventFilter(QObject *o, QEvent *e) {
             break;
         case QEvent::WindowTitleChange:
             if (o == activeSubWindow()) {
-                Q_EMIT sigSetToplevelCaption(w->windowTitle());
+                emit sigSetToplevelCaption(w->windowTitle());
             }
             return QMdiArea::eventFilter(o, e);
             break;
@@ -436,16 +437,16 @@ void CMDIArea::triggerWindowUpdate() {
     if (updatesEnabled()) {
         switch (m_mdiArrangementMode) {
             case ArrangementModeTileVertical:
-                QTimer::singleShot(0, this, &CMDIArea::myTileVertical);
+                QTimer::singleShot(0, this, SLOT(myTileVertical()));
                 break;
             case ArrangementModeTileHorizontal:
-                QTimer::singleShot(0, this, &CMDIArea::myTileHorizontal);
+                QTimer::singleShot(0, this, SLOT(myTileHorizontal()));
                 break;
             case ArrangementModeTile:
-                QTimer::singleShot(0, this, &CMDIArea::myTile);
+                QTimer::singleShot(0, this, SLOT(myTile()));
                 break;
             case ArrangementModeCascade:
-                QTimer::singleShot(0, this, &CMDIArea::myCascade);
+                QTimer::singleShot(0, this, SLOT(myCascade()));
                 break;
             default:
                 break;
@@ -455,7 +456,7 @@ void CMDIArea::triggerWindowUpdate() {
 
 void CMDIArea::enableWindowMinMaxFlags(bool enable)
 {
-    for (auto * const subWindow : subWindowList()) {
+    Q_FOREACH (QMdiSubWindow * const subWindow, subWindowList()) {
         Qt::WindowFlags flags = subWindow->windowFlags();
         if (enable) {
             flags |= (Qt::WindowMinimizeButtonHint | Qt::WindowMaximizeButtonHint);

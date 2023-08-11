@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -17,13 +17,6 @@
 #include "../../util/btconnect.h"
 #include "../../util/macros.h"
 
-
-BtBookshelfModel::BtBookshelfModel(ConstructInPrivate const &) {}
-
-std::shared_ptr<BtBookshelfModel> BtBookshelfModel::newInstance()
-{ return std::make_shared<BtBookshelfModel>(ConstructInPrivate()); }
-
-BtBookshelfModel::~BtBookshelfModel() noexcept = default;
 
 int BtBookshelfModel::rowCount(const QModelIndex & parent) const {
     if (parent.isValid())
@@ -141,6 +134,30 @@ void BtBookshelfModel::addModule(CSwordModuleInfo * const module) {
     endInsertRows();
 }
 
+void BtBookshelfModel::addModules(BtModuleSet const & modules) {
+    QList<CSwordModuleInfo *> newModules;
+    Q_FOREACH(CSwordModuleInfo * const module, modules)
+        if (!m_data.contains(module))
+            newModules.append(module);
+
+    if (newModules.isEmpty())
+        return;
+
+    beginInsertRows(QModelIndex(),
+                    m_data.size(),
+                    m_data.size() + newModules.size() - 1);
+    Q_FOREACH(CSwordModuleInfo * const module, newModules) {
+        m_data.append(module);
+        BT_CONNECT(module, &CSwordModuleInfo::hiddenChanged,
+                   this,   &BtBookshelfModel::moduleHidden);
+        BT_CONNECT(module, &CSwordModuleInfo::hasIndexChanged,
+                   this,   &BtBookshelfModel::moduleIndexed);
+        BT_CONNECT(module, &CSwordModuleInfo::unlockedChanged,
+                   this,   &BtBookshelfModel::moduleUnlocked);
+    }
+    endInsertRows();
+}
+
 void BtBookshelfModel::removeModule(CSwordModuleInfo * const module,
                                     bool destroy) {
     const int index = m_data.indexOf(module);
@@ -171,12 +188,12 @@ void BtBookshelfModel::removeModules(const QList<CSwordModuleInfo *> & modules,
 
 void BtBookshelfModel::removeModules(BtConstModuleSet const & modules, bool destroy){
     // This is inefficient, since signals are emitted for each removed module:
-    for (auto const * const module : modules)
+    Q_FOREACH(CSwordModuleInfo const * const module, modules)
         removeModule(const_cast<CSwordModuleInfo *>(module), destroy);
 }
 
 CSwordModuleInfo * BtBookshelfModel::getModule(const QString & name) const {
-    for (auto * const module : m_data)
+    Q_FOREACH(CSwordModuleInfo * const module, m_data)
         if (UNLIKELY(module->name() == name))
             return module;
     return nullptr;
@@ -204,5 +221,5 @@ void BtBookshelfModel::moduleDataChanged(CSwordModuleInfo * module) {
     BT_ASSERT(m_data.count(module) == 1);
 
     QModelIndex i(index(m_data.indexOf(module), 0));
-    Q_EMIT dataChanged(i, i);
+    emit dataChanged(i, i);
 }

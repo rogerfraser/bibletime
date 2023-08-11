@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -14,7 +14,7 @@
 
 #include <QRegExp>
 #include <QString>
-#include <string>
+#include <QTextCodec>
 #include "../../util/btassert.h"
 #include "../drivers/cswordmoduleinfo.h"
 #include "cswordldkey.h"
@@ -22,31 +22,23 @@
 #include "cswordversekey.h"
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wextra-semi"
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <swkey.h>
 #include <swmodule.h>
 #include <treekey.h>
 #include <treekeyidx.h>
 #include <utilstr.h>
 #include <versekey.h>
-#pragma GCC diagnostic pop
 
 
-CSwordKey::~CSwordKey() noexcept {
-    delete m_afterChangedSignaller.data();
-}
-
-QString CSwordKey::normalizedKey() const { return key(); }
+const QTextCodec * CSwordKey::m_cp1252Codec = QTextCodec::codecForName("Windows-1252");
 
 QString CSwordKey::rawText() {
     if (!m_module)
         return QString();
 
     auto & m = m_module->module();
-    m.getKey()->setText( rawKey() );
+    if (dynamic_cast<sword::SWKey *>(this))
+        m.getKey()->setText( rawKey() );
 
     if (key().isNull())
         return QString();
@@ -57,23 +49,27 @@ QString CSwordKey::rawText() {
 QString CSwordKey::renderedText(const CSwordKey::TextRenderType mode) {
     BT_ASSERT(m_module);
 
+    sword::SWKey * const k = dynamic_cast<sword::SWKey *>(this);
+
     auto & m = m_module->module();
-    sword::VerseKey * vk_mod = dynamic_cast<sword::VerseKey *>(m.getKey());
-    if (vk_mod)
-        vk_mod->setIntros(true);
+    if (k) {
+        sword::VerseKey * vk_mod = dynamic_cast<sword::VerseKey *>(m.getKey());
+        if (vk_mod)
+            vk_mod->setIntros(true);
 
-    m.getKey()->setText(rawKey());
+        m.getKey()->setText(rawKey());
 
-    if (m_module->type() == CSwordModuleInfo::Lexicon) {
-        m_module->snap();
-        /* In lexicons make sure that our key (e.g. 123) was successfully set to the module,
-        i.e. the module key contains this key (e.g. 0123 contains 123) */
+        if (m_module->type() == CSwordModuleInfo::Lexicon) {
+            m_module->snap();
+            /* In lexicons make sure that our key (e.g. 123) was successfully set to the module,
+            i.e. the module key contains this key (e.g. 0123 contains 123) */
 
-        if (sword::stricmp(m.getKey()->getText(), rawKey())
-            && !strstr(m.getKey()->getText(), rawKey()))
-        {
-            qDebug("return an empty key for %s", m.getKey()->getText());
-            return QString();
+            if (sword::stricmp(m.getKey()->getText(), rawKey())
+                && !strstr(m.getKey()->getText(), rawKey()))
+            {
+                qDebug("return an empty key for %s", m.getKey()->getText());
+                return QString();
+            }
         }
     }
 
@@ -117,11 +113,11 @@ QString CSwordKey::renderedText(const CSwordKey::TextRenderType mode) {
         // Reserve characters to reduce number of memory allocations:
         ret.reserve(text.size());
 
-        for (auto const & c : text) {
-            if (c.toLatin1()) {
-                ret.append(c);
+        for (const QChar * c = text.constBegin(); c != text.constEnd(); c++) {
+            if (c->toLatin1()) {
+                ret.append(*c);
             } else {
-                ret.append("&#").append(c.unicode()).append(";");
+                ret.append("&#").append(c->unicode()).append(";");
             }
         }
 
@@ -137,9 +133,19 @@ QString CSwordKey::strippedText() {
         return QString();
 
     auto & m = m_module->module();
-    m.getKey()->setText(std::string(rawKey()).c_str());
+    if (dynamic_cast<sword::SWKey*>(this)) {
+        char * buffer = new char[strlen(rawKey()) + 1];
+        strcpy(buffer, rawKey());
+        m.getKey()->setText(buffer);
+        delete [] buffer;
+    }
 
     return QString::fromUtf8(m.stripText());
+}
+
+void CSwordKey::emitBeforeChanged() {
+    if (!m_beforeChangedSignaller.isNull())
+        m_beforeChangedSignaller->emitSignal();
 }
 
 void CSwordKey::emitAfterChanged() {
@@ -177,6 +183,13 @@ CSwordKey * CSwordKey::createInstance(const CSwordModuleInfo * module) {
             return nullptr;
 
     }
+}
+
+const BtSignal * CSwordKey::beforeChangedSignaller() {
+    if (m_beforeChangedSignaller.isNull())
+        m_beforeChangedSignaller = new BtSignal();
+
+    return m_beforeChangedSignaller;
 }
 
 const BtSignal * CSwordKey::afterChangedSignaller() {

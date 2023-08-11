@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef MODULEITEM_H
+#define MODULEITEM_H
 
 #include "item.h"
 
@@ -38,9 +39,13 @@ public: /* Methods: */
     */
     QVariant data(int role = Qt::DisplayRole) const override;
 
-    CSwordModuleInfo & moduleInfo() const { return m_moduleInfo; }
+    inline CSwordModuleInfo & moduleInfo() const {
+        return m_moduleInfo;
+    }
 
-    bool fitFor(CSwordModuleInfo const &) const override { return false; }
+    inline bool fitFor(const CSwordModuleInfo &) const override {
+        return false;
+    }
 
 private: /* Fields: */
 
@@ -50,3 +55,5 @@ private: /* Fields: */
 };
 
 } // namespace BookshelfModel
+
+#endif // MODULEITEM_H

@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BT_MODULECHOOSERBUTTON
+#define BT_MODULECHOOSERBUTTON
 
 #include <QToolButton>
 
@@ -43,7 +44,7 @@ class BtModuleChooserButton: public QToolButton {
                         int newIndex,
                         int leftLikeModules);
 
-    Q_SIGNALS:
+    signals:
 
         /** User selected a module from menu to replace another module. */
         void sigModuleReplace ( int index, QString newModule );
@@ -54,7 +55,7 @@ class BtModuleChooserButton: public QToolButton {
         /** User selected a module from menu to be removed. */
         void sigModuleRemove ( int index );
 
-    private Q_SLOTS:
+    private slots:
 
         /** Handle the action signal from the menu. */
         void moduleChosen(CSwordModuleInfo const * const module);
@@ -68,3 +69,5 @@ class BtModuleChooserButton: public QToolButton {
 
         BtModuleChooserMenu * m_popup;
 };
+
+#endif

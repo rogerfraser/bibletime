@@ -2,27 +2,23 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CSWORDVERSEKEY_H
+#define CSWORDVERSEKEY_H
 
 #include "cswordkey.h"
 
 #include <QString>
 
 // Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wextra-semi"
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <versekey.h>
-#pragma GCC diagnostic pop
 
 
 class CSwordModuleInfo;
@@ -50,7 +46,7 @@ class CSwordModuleInfo;
  * @author The BibleTime team
  */
 
-class CSwordVerseKey final : public CSwordKey {
+class CSwordVerseKey : public CSwordKey, public sword::VerseKey {
 
     public: /* Types: */
         enum JumpType {
@@ -60,27 +56,6 @@ class CSwordVerseKey final : public CSwordKey {
         };
 
     public: /* Methods: */
-
-        #define BibleTime_CSwordVerseKey_DEFINE_COMP(op) \
-            friend bool operator op(CSwordVerseKey const & lhs, \
-                                    CSwordVerseKey const & rhs) \
-            { \
-                return std::tuple(lhs.testament(), lhs.book(), lhs.chapter(), \
-                                  lhs.verse(), lhs.suffix()) op \
-                       std::tuple(rhs.testament(), rhs.book(), rhs.chapter(), \
-                                  rhs.verse(), rhs.suffix()); \
-            }
-        #if __cpp_impl_three_way_comparison >= 201907L
-        BibleTime_CSwordVerseKey_DEFINE_COMP(<=>)
-        #else
-        BibleTime_CSwordVerseKey_DEFINE_COMP(<)
-        BibleTime_CSwordVerseKey_DEFINE_COMP(<=)
-        BibleTime_CSwordVerseKey_DEFINE_COMP(==)
-        BibleTime_CSwordVerseKey_DEFINE_COMP(!=)
-        BibleTime_CSwordVerseKey_DEFINE_COMP(>=)
-        BibleTime_CSwordVerseKey_DEFINE_COMP(>)
-        #endif
-        #undef BibleTime_CSwordVerseKey_DEFINE_COMP
 
         CSwordVerseKey & operator=(CSwordVerseKey const &) = delete;
 
@@ -102,16 +77,13 @@ class CSwordVerseKey final : public CSwordKey {
         CSwordVerseKey(const sword::VerseKey *k,
                        const CSwordModuleInfo *module);
 
-        sword::SWKey const & asSwordKey() const noexcept final override;
+        CSwordKey* copy() const override;
 
-        CSwordVerseKey * copy() const final override;
+        QString key() const override;
 
-        QString key() const final override;
-        QString normalizedKey() const final override;
+        bool setKey(const QString &key) override;
 
-        bool setKey(const QString &key) final override;
-
-        bool setKey(const char *key) final override;
+        bool setKey(const char *key) override;
 
         /**
         * Jumps to the next entry of the given type
@@ -127,45 +99,14 @@ class CSwordVerseKey final : public CSwordKey {
         * Use "char Book()" to retrieve the book number of the current book.
         * @return The name of the current book
         */
-        QString bookName() const;
+        QString book(const QString& newBook = QString());
 
-        void setBookName(QString const & newBookName)
-        { m_key.setBookName(newBookName.toUtf8().constData()); }
-
-        void setModule(const CSwordModuleInfo *newModule) final override;
-
-        CSwordVerseKey lowerBound() const;
-        void setLowerBound(CSwordVerseKey const & bound);
-
-        CSwordVerseKey upperBound() const;
-        void setUpperBound(CSwordVerseKey const & bound);
-
-        QString shortText() const
-        { return QString::fromUtf8(m_key.getShortText()); }
-
-        void setLocale(char const * const locale) { m_key.setLocale(locale); }
-        bool isBoundSet() const { return m_key.isBoundSet(); }
-        void setIntros(bool v) { m_key.setIntros(v); }
-        char testament() const { return m_key.getTestament(); }
-        void setTestament(char v) { m_key.setTestament(v); }
-        char book() const { return m_key.getBook(); }
-        void setBook(char v) { m_key.setBook(v); }
-        int chapter() const { return m_key.getChapter(); }
-        void setChapter(int v) { m_key.setChapter(v); }
-        int verse() const { return m_key.getVerse(); }
-        void setVerse(int v) { m_key.setVerse(v); }
-        char suffix() const { return m_key.getSuffix(); }
-        void setSuffix(char v) { m_key.setSuffix(v); }
-        long index() const { return m_key.getIndex(); }
-        void setIndex(long v) { m_key.setIndex(v); }
-        void positionToTop() { m_key.setPosition(sword::TOP); }
+        void setModule(const CSwordModuleInfo *newModule) override;
 
     protected:
 
-        const char * rawKey() const final override;
-
-    private: /* Fields: */
-
-        sword::VerseKey m_key;
+        const char * rawKey() const override;
 
 };
+
+#endif

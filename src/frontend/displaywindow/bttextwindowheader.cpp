@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -24,7 +24,7 @@
 #include "../../util/btconnect.h"
 #include "../../util/btmodules.h"
 #include "bttextwindowheaderwidget.h"
-#include "cdisplaywindow.h"
+#include "clexiconreadwindow.h"
 
 
 BtTextWindowHeader::BtTextWindowHeader(CSwordModuleInfo::ModuleType modtype,
@@ -38,10 +38,10 @@ BtTextWindowHeader::BtTextWindowHeader(CSwordModuleInfo::ModuleType modtype,
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setLayoutDirection(Qt::LeftToRight);
     setModules(modules);
-    BT_CONNECT(window, &CDisplayWindow::sigModuleListSet,
-               this /* Needed */, [this] { slotBackendModulesChanged(); });
-    BT_CONNECT(window, &CDisplayWindow::sigModuleListChanged,
-               this, &BtTextWindowHeader::slotWindowModulesChanged);
+    BT_CONNECT(window, SIGNAL(sigModuleListSet(QStringList)),
+               SLOT(slotBackendModulesChanged()));
+    BT_CONNECT(window, SIGNAL(sigModuleListChanged()),
+               SLOT(slotWindowModulesChanged()));
 }
 
 void BtTextWindowHeader::slotBackendModulesChanged() {
@@ -101,12 +101,12 @@ BtTextWindowHeaderWidget* BtTextWindowHeader::addWidget() {
 
     // the button sends signals directly to the window which then signals back when the module
     // list has changed
-    BT_CONNECT(w, &BtTextWindowHeaderWidget::sigModuleAdd,
-               m_window, &CDisplayWindow::slotAddModule);
-    BT_CONNECT(w, &BtTextWindowHeaderWidget::sigModuleReplace,
-               m_window, &CDisplayWindow::slotReplaceModule);
-    BT_CONNECT(w, &BtTextWindowHeaderWidget::sigModuleRemove,
-               m_window, &CDisplayWindow::slotRemoveModule);
+    BT_CONNECT(w,        SIGNAL(sigModuleAdd(int, QString)),
+               m_window, SLOT(slotAddModule(int, QString)));
+    BT_CONNECT(w,        SIGNAL(sigModuleReplace(int, QString)),
+               m_window, SLOT(slotReplaceModule(int, QString)));
+    BT_CONNECT(w,        SIGNAL(sigModuleRemove(int)),
+               m_window, SLOT(slotRemoveModule(int)));
 
     return w;
 }

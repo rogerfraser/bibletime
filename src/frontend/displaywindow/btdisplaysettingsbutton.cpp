@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -34,70 +34,28 @@ BtDisplaySettingsButton::BtDisplaySettingsButton(QWidget *parent)
     initMenu();
     retranslateUi();
 
-    BT_CONNECT(m_popup, &QMenu::triggered,
-               [this](QAction * const action) {
-                   bool checked = action->isChecked();
-
-                   if (action == m_verseNumbersAction) {
-                       m_displayOptions.verseNumbers = checked;
-                       Q_EMIT sigDisplayOptionsChanged(m_displayOptions);
-                   } else if (action == m_variantAction) {
-                       m_filterOptions.textualVariants = checked;
-                       Q_EMIT sigFilterOptionsChanged(m_filterOptions);
-                   } else if (action == m_hebrewPointsAction) {
-                       m_filterOptions.hebrewPoints = checked;
-                       Q_EMIT sigFilterOptionsChanged(m_filterOptions);
-                   } else if (action == m_greekAccentsAction) {
-                       m_filterOptions.greekAccents = checked;
-                       Q_EMIT sigFilterOptionsChanged(m_filterOptions);
-                   } else if (action == m_hebrewCantillationAction) {
-                       m_filterOptions.hebrewCantillation = checked;
-                       Q_EMIT sigFilterOptionsChanged(m_filterOptions);
-                   } else if (action == m_headingsAction) {
-                       m_filterOptions.headings = checked;
-                       Q_EMIT sigFilterOptionsChanged(m_filterOptions);
-                   } else if (action == m_morphSegmentationAction) {
-                       m_filterOptions.morphSegmentation = checked;
-                       Q_EMIT sigFilterOptionsChanged(m_filterOptions);
-                   } else if (action == m_scriptureReferencesAction) {
-                       m_filterOptions.scriptureReferences = checked;
-                       Q_EMIT sigFilterOptionsChanged(m_filterOptions);
-                   } else if (action == m_footnotesAction) {
-                       m_filterOptions.footnotes = checked;
-                       Q_EMIT sigFilterOptionsChanged(m_filterOptions);
-                   } else if (action == m_redWordsAction) {
-                       m_filterOptions.redLetterWords = checked;
-                       Q_EMIT sigFilterOptionsChanged(m_filterOptions);
-                   } else {
-                       BT_ASSERT(false && "Shouldn't happen!");
-                       return;
-                   }
-
-                   Q_EMIT sigChanged();
-               });
+    BT_CONNECT(m_popup, SIGNAL(triggered(QAction *)),
+               this, SLOT(slotOptionToggled(QAction *)));
 }
 
-void BtDisplaySettingsButton::setDisplayOptionsNoRepopulate(
-        DisplayOptions const & displaySettings)
-{ m_displayOptions = displaySettings; }
-
-
-void BtDisplaySettingsButton::setFilterOptionsNoRepopulate(
-        FilterOptions const & moduleSettings)
-{ m_filterOptions = moduleSettings; }
-
 void BtDisplaySettingsButton::setDisplayOptions(
-        DisplayOptions const & displaySettings)
+        const DisplayOptions &displaySettings,
+        bool repopulate)
 {
     m_displayOptions = displaySettings;
-    repopulateMenu();
+    if (repopulate) {
+        repopulateMenu();
+    }
 }
 
 void BtDisplaySettingsButton::setFilterOptions(
-        FilterOptions const & moduleSettings)
+        const FilterOptions &moduleSettings,
+        bool repopulate)
 {
     m_filterOptions = moduleSettings;
-    repopulateMenu();
+    if (repopulate) {
+        repopulateMenu();
+    }
 }
 
 void BtDisplaySettingsButton::setModules(
@@ -164,6 +122,48 @@ void BtDisplaySettingsButton::retranslateToolTip() {
     else {
         setToolTip(tr("Display settings: No options available"));
     }
+}
+
+void BtDisplaySettingsButton::slotOptionToggled(QAction *action) {
+    bool checked = action->isChecked();
+
+
+    if (action == m_verseNumbersAction) {
+        m_displayOptions.verseNumbers = checked;
+        emit sigDisplayOptionsChanged(m_displayOptions);
+    } else if (action == m_variantAction) {
+        m_filterOptions.textualVariants = checked;
+        emit sigFilterOptionsChanged(m_filterOptions);
+    } else if (action == m_hebrewPointsAction) {
+        m_filterOptions.hebrewPoints = checked;
+        emit sigFilterOptionsChanged(m_filterOptions);
+    } else if (action == m_greekAccentsAction) {
+        m_filterOptions.greekAccents = checked;
+        emit sigFilterOptionsChanged(m_filterOptions);
+    } else if (action == m_hebrewCantillationAction) {
+        m_filterOptions.hebrewCantillation = checked;
+        emit sigFilterOptionsChanged(m_filterOptions);
+    } else if (action == m_headingsAction) {
+        m_filterOptions.headings = checked;
+        emit sigFilterOptionsChanged(m_filterOptions);
+    } else if (action == m_morphSegmentationAction) {
+        m_filterOptions.morphSegmentation = checked;
+        emit sigFilterOptionsChanged(m_filterOptions);
+    } else if (action == m_scriptureReferencesAction) {
+        m_filterOptions.scriptureReferences = checked;
+        emit sigFilterOptionsChanged(m_filterOptions);
+    } else if (action == m_footnotesAction) {
+        m_filterOptions.footnotes = checked;
+        emit sigFilterOptionsChanged(m_filterOptions);
+    } else if (action == m_redWordsAction) {
+        m_filterOptions.redLetterWords = checked;
+        emit sigFilterOptionsChanged(m_filterOptions);
+    } else {
+        BT_ASSERT(false && "Shouldn't happen!");
+        return;
+    }
+
+    emit sigChanged();
 }
 
 /** No descriptions */
@@ -235,7 +235,7 @@ void BtDisplaySettingsButton::addMenuEntry(QAction *action, bool checked) {
 }
 
 bool BtDisplaySettingsButton::isOptionAvailable(const CSwordModuleInfo::FilterTypes option) {
-    for (auto const * const module : m_modules)
+    Q_FOREACH(CSwordModuleInfo const * const module, m_modules)
         if (module->has(option))
             return true;
     return false;

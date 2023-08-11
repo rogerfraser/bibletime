@@ -2,9 +2,9 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
@@ -32,13 +32,6 @@
 #include "../btbookshelfview.h"
 #include "btbookshelfwizard.h"
 #include "btinstallpagemodel.h"
-
-// Sword includes:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
-#include <installmgr.h>
-#include <swversion.h>
-#pragma GCC diagnostic pop
 
 
 namespace {
@@ -73,7 +66,7 @@ BtBookshelfWorksPage::BtBookshelfWorksPage(WizardTaskType iType,
                                            QWidget * parent)
     : BtBookshelfWizardPage(parent)
     , m_taskType(iType)
-    , m_groupingOrder(btConfig(), groupingOrderKey)
+    , m_groupingOrder(groupingOrderKey)
 {
     // Initialize menus:
     m_groupingMenu = new BtBookshelfGroupingMenu(this);
@@ -147,8 +140,7 @@ BtBookshelfWorksPage::BtBookshelfWorksPage(WizardTaskType iType,
         m_installPageModel->setDefaultChecked(BtBookshelfTreeModel::CHECKED);
     filterModel->setSourceModel(m_installPageModel);
 
-    /// \todo is this useless if m_taskType == WizardTaskType::removeWorks?
-    m_bookshelfModel = BtBookshelfModel::newInstance();
+    m_bookshelfModel = new BtBookshelfModel(this);
     if (m_taskType == WizardTaskType::removeWorks) {
         m_installPageModel->setSourceModel(CSwordBackend::instance()->model());
     } else {
@@ -175,8 +167,8 @@ BtBookshelfWorksPage::BtBookshelfWorksPage(WizardTaskType iType,
                this,               &BtBookshelfWorksPage::completeChanged);
     BT_CONNECT(m_installPageModel, &BtInstallPageModel::groupingOrderChanged,
                this, &BtBookshelfWorksPage::slotGroupingOrderChanged);
-    BT_CONNECT(m_nameFilterEdit, &QLineEdit::textEdited,
-               filterModel, &BtBookshelfFilterModel::setNameFilterFixedString);
+    BT_CONNECT(m_nameFilterEdit, SIGNAL(textEdited(QString)),
+               filterModel, SLOT(setNameFilterFixedString(QString)));
 
     retranslateUi();
 }
@@ -249,13 +241,10 @@ void BtBookshelfWorksPage::initializePage() {
     {
         QSet<QString> addedModuleNames;
         m_bookshelfModel->clear();
-        m_usedBackends.clear();
         for (auto const & sourceName : sources) {
             sword::InstallSource const source =
                     BtInstallBackend::source(sourceName);
-            std::unique_ptr<CSwordBackend const> backend(
-                        BtInstallBackend::backend(source));
-            bool backendUsed = false;
+            CSwordBackend * const backend = BtInstallBackend::backend(source);
             for (auto * const module : backend->moduleList()) {
                 if (filter(m_taskType, languages, module)) {
                     QString const & moduleName = module->name();
@@ -265,11 +254,8 @@ void BtBookshelfWorksPage::initializePage() {
                     m_bookshelfModel->addModule(module);
                     module->setProperty("installSourceName",
                                         QString(source.caption.c_str()));
-                    backendUsed = true;
                 }
             }
-            if (backendUsed)
-                m_usedBackends.emplace_back(std::move(backend));
         }
         if (m_taskType != WizardTaskType::installWorks)
             m_bookshelfView->expandAll();
@@ -306,7 +292,7 @@ void BtBookshelfWorksPage::slotGroupingOrderChanged(
         BtBookshelfTreeModel::Grouping const & g)
 {
     m_groupingOrder = g;
-    m_groupingOrder.saveTo(btConfig(), groupingOrderKey);
+    m_groupingOrder.saveTo(groupingOrderKey);
 }
 
 BtModuleSet const & BtBookshelfWorksPage::checkedModules() const

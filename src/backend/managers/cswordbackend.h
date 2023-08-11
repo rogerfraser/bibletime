@@ -2,47 +2,43 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef CSWORDBACKEND_H
+#define CSWORDBACKEND_H
 
-#include <memory>
 #include <QObject>
 #include <QString>
 #include <QStringList>
-#include <set>
 #include "../../util/btassert.h"
-#include "../bookshelfmodel/btbookshelfmodel.h"
 #include "../drivers/cswordmoduleinfo.h"
 #include "../drivers/btconstmoduleset.h"
+#include "../bookshelfmodel/btbookshelfmodel.h"
 #include "../filters/gbftohtml.h"
 #include "../filters/osistohtml.h"
 #include "../filters/plaintohtml.h"
 #include "../filters/teitohtml.h"
 #include "../filters/thmltohtml.h"
-#include "../language.h"
 #include "../rendering/cbookdisplay.h"
 #include "../rendering/cchapterdisplay.h"
 #include "../rendering/centrydisplay.h"
 
 // Sword includes:
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wextra-semi"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #include <swmgr.h>
+#include <swbuf.h>
+#include <swmodule.h>
+#include <swversion.h>
+#include <localemgr.h>
+#include <utilstr.h>
 #pragma GCC diagnostic pop
-
-namespace sword {
-class Module;
-class Config;
-} // namespace sword
 
 /**
   \brief The backend layer main class, a backend implementation of Sword.
@@ -55,7 +51,7 @@ class Config;
         BibleTimeApp::~BibleTimeApp(). Only when \ref BackendNotSingleton
         "managing modules" separate backends are created.
 */
-class CSwordBackend: public QObject {
+class CSwordBackend: public QObject, public sword::SWMgr {
 
     Q_OBJECT
 
@@ -83,11 +79,6 @@ public: /* Types: */
         NoModules = 1
     };
 
-private: /* Types: */
-
-    using AvailableLanguagesCacheContainer =
-            std::set<std::shared_ptr<Language const>>;
-
 public: /* Methods: */
 
     /**
@@ -103,17 +94,17 @@ public: /* Methods: */
     ~CSwordBackend() override;
 
     /** \returns the CSwordBackend singleton instance (created if needed). */
-    static CSwordBackend * createInstance() {
+    static inline CSwordBackend * createInstance() {
         BT_ASSERT(!m_instance);
         m_instance = new CSwordBackend();
         return m_instance;
     }
 
     /** \returns the singleton instance, creating it if one does not exist. */
-    static CSwordBackend * instance() { return m_instance; }
+    static inline CSwordBackend * instance() { return m_instance; }
 
     /** \brief Destroys the singleton instance, if one exists. */
-    static void destroyInstance() {
+    static inline void destroyInstance() {
         delete m_instance;
         m_instance = nullptr;
     }
@@ -123,15 +114,16 @@ public: /* Methods: */
       \note This method is equivalent to model()->modules().
       \returns The list of modules managed by this backend.
     */
-    QList<CSwordModuleInfo*> const & moduleList() const
-    { return m_dataModel->moduleList(); }
+    inline const QList<CSwordModuleInfo*> & moduleList() const {
+        return m_dataModel.moduleList();
+    }
+    BtModuleList moduleList(CSwordModuleInfo::ModuleType type) const;
 
-    std::shared_ptr<BtBookshelfModel> model() { return m_dataModel; }
+    inline BtBookshelfModel * model() {
+        return &m_dataModel;
+    }
 
     CSwordModuleInfo * findFirstAvailableModule(CSwordModuleInfo::ModuleType type);
-
-    std::shared_ptr<AvailableLanguagesCacheContainer const>
-    availableLanguages() noexcept;
 
     /**
       \brief Initializes the Sword modules.
@@ -154,15 +146,12 @@ public: /* Methods: */
 
     void setFilterOptions(const FilterOptions & options);
 
-    /** \returns the language for the international booknames of Sword. */
-    QString booknameLanguage() const;
-
     /**
       \brief Sets the language for the international booknames of Sword.
       \param[in] langName The abbreviation string which should be used for the
                           Sword backend.
     */
-    void setBooknameLanguage(QString const & langName);
+    const QString booknameLanguage(const QString & langName = QString());
 
     /**
       \brief Searches for a module with the given description.
@@ -189,7 +178,9 @@ public: /* Methods: */
       \returns The global config object containing the configs of all modules
                merged together.
     */
-    sword::SWConfig * getConfig() const { return m_manager.config; }
+    inline sword::SWConfig * getConfig() const {
+        return config;
+    }
 
     /**
       \param[in] option The option name to return.
@@ -248,12 +239,7 @@ public: /* Methods: */
     */
     void deleteOrphanedIndices();
 
-    QString prefixPath() const
-    { return QString::fromLatin1(m_manager.prefixPath); }
-
-    sword::SWMgr & raw() { return m_manager; }
-
-Q_SIGNALS:
+signals:
 
     void sigSwordSetupChanged(CSwordBackend::SetupChangedReason reason);
 
@@ -266,6 +252,8 @@ protected: /* Methods: */
     CSwordBackend();
 
     /** Reimplemented from sword::SWMgr. */
+    void addRenderFilters(sword::SWModule * module,
+                          sword::ConfigEntMap & section) override;
 
     QStringList getSharedSwordConfigFiles() const;
     QString getPrivateSwordConfigPath() const;
@@ -273,36 +261,22 @@ protected: /* Methods: */
 
 private: /* Fields: */
 
-    struct Private: public sword::SWMgr {
-
-    /* Methods: */
-
-        using sword::SWMgr::SWMgr;
-
-        void shutdownModules();
-        void reloadConfig();
-        void addRenderFilters(sword::SWModule * module,
-                              sword::ConfigEntMap & section) override;
-
-    /* Fields: */
-
-        Filters::GbfToHtml   m_gbfFilter;
-        Filters::OsisToHtml  m_osisFilter;
-        Filters::PlainToHtml m_plainFilter;
-        Filters::TeiToHtml   m_teiFilter;
-        Filters::ThmlToHtml  m_thmlFilter;
-
-    } m_manager;
+    // Filters:
+    Filters::GbfToHtml   m_gbfFilter;
+    Filters::OsisToHtml  m_osisFilter;
+    Filters::PlainToHtml m_plainFilter;
+    Filters::TeiToHtml   m_teiFilter;
+    Filters::ThmlToHtml  m_thmlFilter;
 
     // Displays:
     Rendering::CChapterDisplay m_chapterDisplay;
     Rendering::CEntryDisplay   m_entryDisplay;
     Rendering::CBookDisplay    m_bookDisplay;
 
-    std::shared_ptr<BtBookshelfModel> const m_dataModel;
-    std::shared_ptr<AvailableLanguagesCacheContainer const>
-            m_availableLanguagesCache;
+    BtBookshelfModel m_dataModel;
 
     static CSwordBackend * m_instance;
 
 };
+
+#endif

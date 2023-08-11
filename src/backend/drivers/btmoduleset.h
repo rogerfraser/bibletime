@@ -2,15 +2,16 @@
 *
 * In the name of the Father, and of the Son, and of the Holy Spirit.
 *
-* This file is part of BibleTime's source code, https://bibletime.info/
+* This file is part of BibleTime's source code, http://www.bibletime.info/
 *
-* Copyright 1999-2021 by the BibleTime developers.
+* Copyright 1999-2020 by the BibleTime developers.
 * The BibleTime source code is licensed under the GNU General Public License
 * version 2.0.
 *
 **********/
 
-#pragma once
+#ifndef BTMODULESET_H
+#define BTMODULESET_H
 
 #include <QSet>
 
@@ -21,15 +22,17 @@ class BtModuleSet: public QSet<CSwordModuleInfo *> {
 
 public: /* Methods: */
 
-    BtModuleSet() = default;
+    inline BtModuleSet() {}
 
-    BtModuleSet(QSet<CSwordModuleInfo *> const & copy)
+    inline BtModuleSet(QSet<CSwordModuleInfo *> const & copy)
         : QSet<CSwordModuleInfo *>(copy)
     {}
 
-    bool contains(CSwordModuleInfo const * const m) const {
+    inline bool contains(CSwordModuleInfo const * const m) const {
         return this->QSet<CSwordModuleInfo *>::contains(
                 const_cast<CSwordModuleInfo *>(m));
     }
 
 };
+
+#endif /* BTMODULESET_H */
