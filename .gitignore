@@ -30,5 +30,5 @@ bibletime*.qm
 moc_*.cpp
 qrc_*.cpp
 /.vscode
-i18n/handbook/*.po
-i18n/howto/*.po
+/i18n
+/i18n
